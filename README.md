@@ -19,7 +19,9 @@ Git 保存源代码、参数模板、测试和研究文档；`data/`、`runs/`�
 
 ## Windows 与打包状态
 
-每次推送 `main`，GitHub Actions 的 **Windows portable package** 自动在 Windows 上测试并构建带 Python、Node 和运行依赖的便携 ZIP。请在 Actions 最近成功运行的 **Artifacts** 中下载 **ArbitrageDesign-Windows-x64**，解压程序包后只需两个入口：
+每次推送 `main`，GitHub Actions 的 **Windows portable package** 自动在 Windows 上测试、构建并公开发布带 Python、Node 和运行依赖的便携 ZIP。
+
+[直接下载最新版 Windows 完整包](https://github.com/goodperson888/arbitrage-design/releases/latest/download/ArbitrageDesign-Windows-x64.zip)（无需登录 GitHub）。历史版本和校验文件见 [Releases](https://github.com/goodperson888/arbitrage-design/releases)。解压程序包后只需两个入口：
 
 1. `开启.cmd`：自动检查环境，首次提示数据目录和代理端口（默认 `7890`，输入 `0` 直连），保存后开启纸上监控、5/15分钟采集和 Gate，并打开页面。后续直接复用设置。
 2. `停止.cmd`：正常关闭全部服务，保留数据。

@@ -4,11 +4,13 @@ Mac 用于开发；Windows 用于长期监控和记录。便携包包含 Windows
 
 ## 获取可运行包
 
-每次推送 `main`，GitHub Actions 自动运行 **Windows portable package**：先运行 Windows 回归测试，再构建便携 ZIP，最后在 Windows 上测试六个服务的启动、页面访问、重复启动保护、正常关闭、gzip 完整性和账本续写。通过后才上传下载文件。
+每次推送 `main`，GitHub Actions 自动运行 **Windows portable package**：先运行 Windows 回归测试，再构建便携 ZIP，最后在 Windows 上测试六个服务的启动、页面访问、重复启动保护、正常关闭、gzip 完整性和账本续写。通过后才上传下载文件，并发布到公开的 GitHub Releases。
 
-在仓库页面打开 **Actions → Windows portable package → 最近成功的运行 → Artifacts → ArbitrageDesign-Windows-x64**。下载并解压，里面有程序 ZIP 和 `SHA256SUMS.txt`；再将程序 ZIP 解压到固定目录，例如 `D:\Apps\ArbitrageDesign`。不要直接在 ZIP 预览里双击脚本。
+[直接下载最新版完整包](https://github.com/goodperson888/arbitrage-design/releases/latest/download/ArbitrageDesign-Windows-x64.zip)，无需登录 GitHub，可在其他电脑直接使用这个固定地址。下载后解压到固定目录，例如 `D:\Apps\ArbitrageDesign`。不要直接在 ZIP 预览里双击脚本。
 
-GitHub 的绿色 **Code → Download ZIP** 下载的是源码，不包含便携运行时；也可以解压后点击 `开启.cmd`，首次会联网自动准备环境。推荐完整便携包，省去目标机器上的首次安装下载。Actions 下载通常需要登录 GitHub。构建产物保留 30 天，过期后可以在 Actions 通过 **Run workflow** 重新打包。
+[Releases 页面](https://github.com/goodperson888/arbitrage-design/releases)保留各次公开发布及 `SHA256SUMS.txt`。请选择 `ArbitrageDesign-Windows-x64.zip`，GitHub 自动生成的 Source code ZIP 只是源码。
+
+GitHub 的绿色 **Code → Download ZIP** 下载的是源码，不包含便携运行时；也可以解压后点击 `开启.cmd`，首次会联网自动准备环境。推荐完整便携包，省去目标机器上的首次安装下载。Actions 的 Artifacts 仍作为备用下载，需要登录且保留 30 天；公开 Release 下载没有这项登录要求，也不受 Artifacts 的 30 天保留期限制。
 
 包里的 `build-info.json` 记录对应代码提交、运行时版本及校验值；`dependency-lock.json` 记录本次包内的全部依赖版本及各 wheel 的 SHA-256。运行依赖安装后不需要联网下载，行情采集本身仍需网络连接。
 
