@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+
+# Research data should live outside git or be generated locally.
+data/
+runs/
+*.duckdb
+*.parquet
+*.ndjson.part

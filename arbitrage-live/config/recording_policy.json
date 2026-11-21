@@ -1,0 +1,8 @@
+{
+  "raw_sample_seconds": 5,
+  "orderbook_sample_seconds": 5,
+  "signal_reject_cooldown_seconds": 1,
+  "orderbook_levels": 10,
+  "retention_days": 7,
+  "notes": "raw/events/signals are historical high-frequency streams; orders/fills/settlements are never sampled"
+}

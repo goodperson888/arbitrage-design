@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "validation_id": "btc_15m_binance_hyperliquid_deribit_v1",
+  "market_duration_minutes": 15,
+  "paper_only": true,
+  "data_dir": "data/cross_market_validation_15m",
+  "observation_remaining_seconds": [720, 600, 480, 360, 300, 240, 180, 120, 90, 60, 30],
+  "observation_tolerance_seconds": 2.5,
+  "venue_snapshot_interval_ms": 1000,
+  "memory_window_seconds": 1800,
+  "discovery_interval_seconds": 2.0,
+  "settlement_interval_seconds": 5.0,
+  "store_raw_messages": false,
+  "raw_sample_interval_ms": 1000,
+  "lead_lag_interval_ms": 100,
+  "option_strikes_each_side": 12,
+  "polymarket_book_enabled": true,
+  "polymarket_snapshot_interval_ms": 1000,
+  "polymarket_quantity": 10,
+  "polymarket_depth_caps": [0.70, 0.75, 0.80, 0.85, 0.90]
+}

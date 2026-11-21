@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "research_id": "btc_5m_last_window_entry_20260821",
+  "mode": "advisory_tags_only",
+  "enabled_for_execution": false,
+  "may_override_strategy": false,
+  "baseline_strategy": {
+    "path": "configs/strategies/last_2m_threshold.json",
+    "expected_sha256": "70a107f4a648ac452e1cac67f54694fd45659e6414bf915dfc44303d5ca0d72d"
+  },
+  "tags": {
+    "research_price_band": ["0.75-0.80", "0.80-0.85", "other"],
+    "research_remaining_band_seconds": ["90-60", "60-30", "30-0", "other"],
+    "research_path": ["up_cross", "down_cross", "inside", "unknown"],
+    "research_trade_size_band": ["lt_10", "gte_10", "unknown"],
+    "research_terminal_30s": [true, false]
+  },
+  "hypotheses": [
+    {
+      "id": "down_75_80_down_cross",
+      "status": "monitor_only",
+      "outcome": "DOWN",
+      "price_min": "0.75",
+      "price_max": "0.80",
+      "path": "down_cross",
+      "reason": "positive in six early chronological blocks but negative in latest block and same-period subset"
+    },
+    {
+      "id": "down_80_85_remaining_60_30",
+      "status": "disabled",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "max_remaining_seconds": 60,
+      "min_remaining_seconds": 30,
+      "reason": "negative in latest block and both same-period execution proxies"
+    },
+    {
+      "id": "down_80_85_trade_size_gte_10",
+      "status": "best_research_signal_monitor_only",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "observed_trade_size_min": "10",
+      "reason": "positive across combined, recent200, week168 and same47, but historical trade-size signal is not executable order-book depth"
+    },
+    {
+      "id": "terminal_30_seconds",
+      "status": "diagnostic_only",
+      "max_remaining_seconds": 30,
+      "min_remaining_seconds": 0,
+      "reason": "likely survivor bias and unverified executable liquidity near settlement"
+    }
+  ],
+  "required_comparison_metrics": [
+    "signal_count",
+    "fill_count",
+    "unfilled_count",
+    "win_rate",
+    "net_pnl_per_share",
+    "opportunity_rate",
+    "average_vwap",
+    "execution_delay_ms"
+  ],
+  "report": "experiments/archive/btc_5m_last_window_entry_20260821/REPORT.md"
+}

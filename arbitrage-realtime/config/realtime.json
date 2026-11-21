@@ -1,0 +1,8 @@
+{
+  "symbol": "BTCUSDT",
+  "interval_seconds": 300,
+  "rolling_window_seconds": 60,
+  "stale_after_seconds": 2,
+  "minimum_distance_bps": 0,
+  "minimum_probability": 0.55
+}

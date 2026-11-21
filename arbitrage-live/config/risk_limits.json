@@ -1,0 +1,17 @@
+{
+  "max_order_budget_usd": 5,
+  "min_valid_fill_usd": 2.5,
+  "max_entry_price": 0.85,
+  "max_daily_loss_count": 2,
+  "max_daily_loss_usd": 10,
+  "max_orders_per_market": 1,
+  "max_unsettled_markets": 1,
+  "risk_day_timezone": "Asia/Shanghai",
+  "max_unsettled_exposure_usd": null,
+  "canary": {
+    "transport_enabled": false,
+    "max_order_budget_usd": 0,
+    "max_daily_budget_usd": 0,
+    "manual_ack_required": true
+  }
+}

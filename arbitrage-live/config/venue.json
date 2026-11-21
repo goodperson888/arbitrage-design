@@ -1,0 +1,35 @@
+{
+  "polymarket": {
+    "clob_url": "",
+    "gamma_url": "",
+    "ws_url": "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+    "rtds_url": "wss://ws-live-data.polymarket.com"
+  },
+  "binance": {
+    "spot_ws_url": "wss://stream.binance.com:9443/ws",
+    "symbol": "BTCUSDT"
+  },
+  "timeouts": {
+    "market_data_max_age_seconds": null,
+    "api_timeout_seconds": null,
+    "clock_skew_seconds": null
+  },
+  "transport": {
+    "websocket_enabled": false,
+    "rtds_enabled": false,
+    "order_enabled": false,
+    "reconciliation_enabled": false
+  },
+  "clob_signing": {
+    "chain_id": 137,
+    "signature_type": 0,
+    "funder": "",
+    "private_key_env": "POLYMARKET_PRIVATE_KEY",
+    "api_key_env": "POLYMARKET_API_KEY"
+  },
+  "credentials": {
+    "source": "environment_or_macos_keychain",
+    "private_key": "",
+    "api_key": ""
+  }
+}

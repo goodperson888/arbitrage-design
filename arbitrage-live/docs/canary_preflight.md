@@ -1,0 +1,25 @@
+# Canary preflight checklist
+
+- [ ] Observe mode runs with no credentials and no outbound order calls.
+- [ ] Market discovery verifies BTC 5-minute condition and DOWN token mapping.
+- [ ] Polymarket and Binance freshness, heartbeat, reconnect, and clock gates have concrete reviewed thresholds.
+- [ ] Active-trade deduplication and per-market idempotency key are tested.
+- [ ] FAK price cap `0.85`, fee-inclusive `5U` cap, and `2.5U` effective-fill floor are tested with tick rounding.
+- [ ] CLOB V2 pUSD collateral is at least the configured budget; live FAK sizing uses the market's dynamic `fd.rate/fd.exponent` and supplies `user_usdc_balance` to the SDK.
+- [ ] Partial fills are reconciled without automatic top-up or retry.
+- [ ] Exact trade IDs are deduplicated; actual quantity, notional, fee, VWAP, and cost are persisted before settlement. Fills below `2.5U` are recorded but excluded from the formal loss gate.
+- [ ] Unknown order state pauses the market; no blind retry is possible.
+- [ ] Critical ledger write failure disables new orders; raw queue overflow is observable.
+- [ ] Restart reconciliation restores open orders, fills, balances, unsettled positions, and settlement state before any admission.
+- [ ] Dashboard authenticated preflight confirms CLOB V2 SDK, L1/L2 identity, available collateral, allowance, zero remote open orders, no unresolved local orders, venue status, and fresh Polymarket/Binance feeds.
+- [ ] Daily halt is tested with the configured “每日亏损笔数上限” and “每日累计亏损上限（U）” (defaults: two losses / 10U); either limit stops new orders and next-day recovery still requires manual resume.
+- [ ] Emergency stop cancels cancellable orders and leaves reconciliation running.
+- [ ] Credentials come only from environment or macOS Keychain; logs and UI redact all secrets.
+- [ ] A human explicitly reviews and enables the optional `PyClobClientTransport` canary path; the checked-in configuration remains disabled.
+- [ ] WebSocket adapter contract, market discovery, normalized Decimal events, FAK request builder, and SQLite order state machine integration tests pass.
+- [ ] Unknown/timeout orders remain paused across process restart until reconciliation returns an explicit remote state.
+- [ ] Read-only WS reconnect/heartbeat/freshness tests pass; no order or cancel method is reachable from market adapters.
+- [ ] `preflight` reports safe by default and fails closed when order switch, non-observe mode, key-file loading, or transport approval is present.
+- [ ] Optional SDK dependency is pinned/reviewed; mock SDK covers FAK submit, `get_order`, `cancel_order`, trade fills, timeouts, and no-retry behavior.
+- [ ] `transport_enabled=false` remains the checked-in default; changing it requires a reviewed rollout and explicit `LIVE_TRADING_ENABLE=1`.
+- [ ] `min_entry_vwap=0.80` is active, expected and reconciled fill VWAP is 0.80–0.85, and the five-second gate requires the DOWN sell price to rise by at least 0.01 without a reverse drop.

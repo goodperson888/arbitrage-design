@@ -1,0 +1,21 @@
+{
+  "strategy_id": "polymarket_btc_5m_down_spot5m_v1",
+  "side": "DOWN",
+  "remaining_seconds": {"min": 30, "max": 90},
+  "max_budget_usd": 5,
+  "min_valid_cost_usd": 2.5,
+  "max_entry_price": 0.85,
+  "reversal_window_seconds": 5,
+  "reversal_tolerance": 0.01,
+  "binance_lookback_seconds": 300,
+  "binance_symbol": "BTCUSDT",
+  "active_trade_min_quantity": 10,
+  "active_trade_multiplier": 1.5,
+  "market_data_max_age_seconds": 2,
+  "min_entry_vwap": 0.80,
+  "min_entry_momentum": 0.01,
+  "fee_rate": 0.07,
+  "fee_exponent": 1,
+  "quantity_step": 0.01,
+  "execution_model_version": "fak_partial_v1"
+}

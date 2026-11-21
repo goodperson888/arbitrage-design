@@ -1,0 +1,9 @@
+data/
+*.sqlite3
+*.ndjson
+.env
+.env.*
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/

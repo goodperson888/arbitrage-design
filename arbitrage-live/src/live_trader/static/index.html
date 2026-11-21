@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polymarket Live Console</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <p class="eyebrow">ARBITRAGE / LIVE</p>
+          <h1>Polymarket Live Console</h1>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="modeBadge" class="badge badge-safe">OBSERVE · 只读</span>
+        <span id="lastUpdate" class="last-update">等待状态</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel strategy-card" aria-label="当前策略">
+          <div class="panel-heading"><span>当前策略</span><span class="tiny-label">v1</span></div>
+          <div id="strategyGrid" class="strategy-grid"></div>
+      </section>
+
+      <section id="operatorOverview" class="overview-grid" aria-label="运行总览">
+        <article class="panel overview-card overview-primary">
+          <div class="panel-heading"><span>运行总览</span><span id="overviewMode" class="tiny-label">OBSERVE</span></div>
+          <div class="overview-value" id="overviewService">等待启动</div>
+          <div class="overview-meta"><span>订单闸门</span><strong id="overviewOrderGate">只读关闭</strong></div>
+        </article>
+        <article class="panel overview-card">
+          <div class="panel-heading"><span>数据链路</span><span class="tiny-label">READ-ONLY</span></div>
+          <div class="overview-list">
+            <div><span class="term" tabindex="0" data-tooltip="Market WebSocket：Polymarket 公开盘口、成交和市场事件的实时只读连接。">Market WS</span><strong id="overviewMarketFeed">等待</strong></div>
+            <div><span>Binance Spot</span><strong id="overviewBinanceFeed">等待</strong></div>
+            <div><span class="term" tabindex="0" data-tooltip="RTDS：Polymarket 的外部参考行情服务，可提供 Binance 与 Chainlink 价格；只读、不下单。">RTDS 参考</span><strong id="overviewReferenceFeed">默认关闭</strong></div>
+          </div>
+        </article>
+        <article class="panel overview-card overview-actions-card">
+          <div class="panel-heading"><span>操作顺序</span><span class="tiny-label">3 STEPS</span></div>
+          <div class="step-list"><span><b>1</b>保存设置</span><span><b>2</b>启动前检查</span><span><b>3</b>启动当前模式</span></div>
+          <small class="overview-hint">真实订单仍需显式开关、凭据和 preflight 全部通过。</small>
+        </article>
+      </section>
+
+      <section class="panel market-panel" aria-labelledby="marketTitle">
+        <div class="panel-heading"><div><span id="marketTitle">Polymarket 行情</span><small id="marketFeed"><span class="term" tabindex="0" data-tooltip="Market WebSocket：Polymarket 主动推送指定 token 的盘口、成交和市场状态；后台被动接收，无需签名。">公开 Market WebSocket · 被动推送 · 只读</span></small></div><span id="marketStatus" class="tiny-label">等待行情</span></div>
+        <div class="market-live-head">
+          <div><span class="eyebrow accent">当前市场</span><h3 id="marketLiveQuestion">尚未发现 BTC 5m 市场</h3><code id="marketLiveSlug">—</code></div>
+          <div class="market-countdown"><small>距离结算</small><strong id="marketLiveCountdown">—</strong></div>
+        </div>
+        <div class="market-grid">
+          <div class="market-item"><span>市场</span><strong id="marketId">—</strong><small id="marketQuestion">尚未发现 BTC 5m 市场</small><small id="marketIdentityMeta">token UP/DOWN · 数据源 Market WS</small></div>
+          <div class="market-item quote-item quote-up"><span>UP 买一 / 卖一</span><strong><b id="marketUpBid">—</b> / <b id="marketUpAsk">—</b></strong><small>卖一数量 <b id="marketUpAskSize">—</b> 份 · 10份 VWAP <b id="marketUpVwap">—</b> · 最新成交 <b id="marketUpLast">—</b></small></div>
+          <div class="market-item quote-item quote-down"><span>DOWN 买一 / 卖一</span><strong><b id="marketDownBid">—</b> / <b id="marketDownAsk">—</b></strong><small>卖一数量 <b id="marketDownAskSize">—</b> 份 · 10份 VWAP <b id="marketDownVwap">—</b> · 最新成交 <b id="marketDownLast">—</b></small><span id="marketBestBid" hidden></span><span id="marketBestAsk" hidden></span></div>
+          <div class="market-item"><span>最新主动成交</span><strong id="marketLastTrade">—</strong><small id="marketTradeMeta">方向 · BUY/SELL · 数量</small></div>
+          <div class="market-item"><span>剩余时间</span><strong id="marketRemaining">—</strong><small id="marketUpdated">更新时间 —</small></div>
+          <div class="market-item"><span>Binance Spot 5m</span><strong id="marketBinanceReturn">—</strong><small>参考特征 · 不阻断入场</small></div>
+          <div class="market-item"><span class="term" tabindex="0" data-tooltip="CLOB：Polymarket 的订单簿交易接口；需要签名身份，当前默认关闭。">订单接口 · CLOB</span><strong id="marketClobStatus">CLOB 已关闭</strong><small>行情与下单链路分离</small></div>
+        </div>
+        <div class="result-strip" aria-label="市场结果价格">
+          <div class="result-heading"><span>市场结果价格</span><small>UP + DOWN 理论上接近 1.00（100%）· 当前按各方向卖一观察</small></div>
+          <div class="result-values">
+            <div><span>UP</span><strong id="resultUpPrice">—</strong><small id="resultUpPercent">—</small></div>
+            <div><span>DOWN</span><strong id="resultDownPrice">—</strong><small id="resultDownPercent">—</small></div>
+            <div><span>合计</span><strong id="resultSum">—</strong><small id="resultSumNote">等待两边行情</small></div>
+          </div>
+        </div>
+        <div class="market-cadence"><span>接收方式</span><strong>后台长连接被动接收</strong><span>页面展示</span><strong id="marketPageRefresh">约每 2.5 秒刷新</strong></div>
+        <div class="market-decision" aria-live="polite"><span>最近一次策略判断</span><strong id="lastSignalStatus">尚无判断</strong><small id="lastSignalReason">启动 observe 后，满足或拒绝原因会显示在这里。</small></div>
+        <div class="reference-strip" aria-label="Polymarket RTDS 参考行情">
+          <div class="reference-heading"><span class="term" tabindex="0" data-tooltip="RTDS：额外的公开参考价 WebSocket。默认关闭，因为它不是下单必需链路，避免无意建立额外公网连接。">RTDS 参考行情</span><small>RTDS 默认关闭 · 仅在显式开启后连接 · 不参与下单门禁</small></div>
+          <div class="reference-values">
+            <div><span class="term" tabindex="0" data-tooltip="Chainlink：预言机参考价，不是 Polymarket 盘口，也不是结算结果。">Chainlink</span><strong id="referenceChainlink">—</strong><small id="referenceChainlinkMeta">等待 RTDS</small></div>
+            <div><span class="term" tabindex="0" data-tooltip="Chainlink TWAP：Chainlink 计算的时间加权平均价；30s 是回看窗口，不是每 30 秒才更新一次。">Chainlink TWAP 30s</span><strong id="referenceTwap30">—</strong><small id="referenceTwap30Meta">等待 RTDS</small></div>
+            <div><span>Binance RTDS</span><strong id="referenceBinance">—</strong><small id="referenceBinanceMeta">等待 RTDS</small></div>
+          </div>
+        </div>
+      </section>
+
+      <details id="advancedSettings" class="panel settings-panel">
+        <summary class="settings-summary"><div><span id="settingsTitle">高级设置与启动 · 实盘设置</span><small>普通配置本地保存；私钥只进入 macOS Keychain · 默认收起</small></div><span id="settingsStatus" class="tiny-label">未加载</span></summary>
+        <details class="config-help">
+          <summary>不会填？查看每一项从哪里找</summary>
+          <div class="config-help-grid">
+            <div><strong>MetaMask 地址与 Funder</strong><p>MetaMask 登录地址是私钥派生出的 EOA signer；Funder 是 Polymarket 存放资金的地址。类型 0 时两者相同，类型 3 deposit wallet 时通常不同，但 signer 必须是它的 owner 或已授权 session signer。</p></div>
+            <div><strong>私钥</strong><p>钱包登录请从你实际使用的钱包扩展的账户详情导出对应私钥；只输入本地页面，程序会写入 macOS Keychain。不要发到聊天或截图里，也不要填写助记词。</p></div>
+            <div><strong>CLOB 身份配置</strong><p>先填写 Funder、私钥和签名类型，点击“配置并派生身份”。软件通过 Polymarket CLOB 派生 API 凭据，不再调用 Polygon RPC 猜测账户类型。</p></div>
+            <div><strong>Polygon RPC</strong><p>默认使用 Polygon 当前公开的 <code>https://polygon.drpc.org</code>；只有连接失败或较慢时才换成你自己的 Polygon RPC。</p></div>
+            <div><strong>代理</strong><p>电脑没有代理就留空；只有你本地通过代理访问网络时才填写，例如 <code>http://127.0.0.1:7890</code>。CLOB 身份派生和验证会使用这里填写的代理。</p></div>
+            <div><strong>Relayer API 密钥</strong><p>你截图里的页面用于 Relayer 服务，不是 CLOB 下单身份；本程序不读取它。CLOB 的 L2 凭据会由官方 SDK 根据签名私钥自动派生并写入 Keychain。</p></div>
+            <div><strong>单笔下单额度</strong><p>这是每次 FAK 请求的含手续费预算上限，最低 2.5U；系统不会自动使用账户全部余额。</p></div>
+            <div><strong>动态主动成交门槛</strong><p>门槛取“最低份数”和“本次计划买入份数 × 倍数”中较大的值。价格越低、相同预算能买的份数越多，要求看到的真实主动买入也会相应提高。</p></div>
+          </div>
+        </details>
+        <div class="settings-grid">
+          <label class="field"><span class="term" tabindex="0" data-tooltip="这是你在 MetaMask 顶部当前选中的公开地址；它应当与下面由私钥派生的 signer 一致。">MetaMask 登录地址</span><input id="walletAddress" autocomplete="off" placeholder="0x…" inputmode="text" /></label>
+          <label class="field"><span>订单签名私钥（只写入 Keychain）</span><input id="privateKey" type="password" autocomplete="new-password" minlength="66" maxlength="66" pattern="0x[0-9a-fA-F]{64}" title="必须是 0x 开头、后接 64 个十六进制字符（共 32 字节）" placeholder="0x + 64 个十六进制字符；不会回显或写入监控目录" /><small>格式必须是 <code>0x</code> 加 64 个十六进制字符（总长度 66）；如果钱包只复制出 64 个字符，请在本地输入框前加 <code>0x</code>，不要把私钥发到聊天。</small></label>
+          <label class="field"><span>Polygon RPC</span><input id="rpcUrl" autocomplete="url" value="https://polygon.drpc.org" /></label>
+          <label class="field"><span>代理（可选）</span><input id="proxy" autocomplete="url" placeholder="http://127.0.0.1:7890" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="运行模式是权限上限：observe 只读，canary 受限，live 仍必须通过 preflight 和显式开关。">运行模式</span><select id="liveMode"><option value="observe">observe · 只读采集</option><option value="canary">canary · 受限实盘</option><option value="live">live · 实盘</option></select></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="DOWN 只买跌，UP 只买涨，UP+DOWN 会在同一市场分别评估两边，但单市场仍最多成交一笔。">交易方向</span><select id="strategySide"><option value="DOWN">DOWN · 只买跌</option><option value="UP">UP · 只买涨</option><option value="BOTH">UP+DOWN · 涨跌都评估</option></select></label>
+          <label class="field"><span>账户类型</span><input id="accountType" readonly placeholder="配置后显示" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="Funder 是 Polymarket 实际持有 pUSD 和仓位的资金地址；deposit wallet 类型下它不是 MetaMask EOA 地址。">Polymarket Funder 资金地址</span><input id="funder" autocomplete="off" placeholder="Polymarket deposit wallet / proxy / safe 地址" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="这个地址由本地 Keychain 中的订单签名私钥计算得出。它必须等于 MetaMask 当前登录地址，或已被 deposit wallet 授权。">私钥派生的 signer 地址</span><input id="signerAddress" readonly placeholder="配置并派生身份后显示" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="signature_type：告诉 CLOB 订单应由哪类钱包/代理验证；EOA 通常选择 0。">signature_type</span><select id="signatureType"><option value="0">0 · EOA（钱包登录优先）</option><option value="1">1 · POLY_PROXY（Magic 邮箱）</option><option value="2">2 · GNOSIS_SAFE</option><option value="3">3 · POLY_1271 / deposit wallet</option></select></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="每次 FAK 请求含手续费的最高花费；系统按当前盘口和这个额度自动计算可买份数。">单笔下单额度（U）</span><input id="maxBudgetUsd" type="number" min="2.5" step="0.1" inputmode="decimal" value="5" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="动态门槛的绝对下限；再小的订单也至少要求这么多份官方主动 DOWN BUY。">主动成交最低份额</span><input id="activeTradeMinQuantity" type="number" min="0.01" step="0.01" inputmode="decimal" value="10" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="动态门槛 = max(最低份额, 本次计划买入份数 × 此倍数)。默认 1.5。">主动成交/计划买入倍数</span><input id="activeTradeMultiplier" type="number" min="1" step="0.1" inputmode="decimal" value="1.5" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="按 Asia/Shanghai 自然日统计；达到这个数量的已确认亏损结算后，停止新的订单。与累计亏损限额任一先到即停。">每日亏损笔数上限</span><input id="maxDailyLossCount" type="number" min="1" step="1" inputmode="numeric" value="2" /></label>
+          <label class="field"><span class="term" tabindex="0" data-tooltip="按已确认结算的净亏损累计，单位 U；达到后停止新的订单。未结算仓位不提前计入。">每日累计亏损上限（U）</span><input id="maxDailyLossTotalUsd" type="number" min="0.01" step="0.1" inputmode="decimal" value="10" /></label>
+        </div>
+        <div id="modeHelp" class="mode-note" role="status"></div>
+        <div id="orderSafetyBanner" class="order-safety" role="status">
+          <div><strong id="orderSafetyTitle">真实下单：关闭</strong><small id="orderSafetyDetail">observe 只读采集，不会提交订单。</small></div>
+          <div class="order-safety-steps"><span>1 身份验证</span><span>2 行情新鲜</span><span>3 预检通过</span><span>4 canary 首单</span></div>
+        </div>
+        <div class="settings-actions">
+          <button id="detectAccount" class="button secondary" type="button">配置并派生身份</button>
+          <button id="validateIdentity" class="button secondary" type="button">验证身份（不下单）</button>
+          <button id="saveSettings" class="button" type="button">保存设置</button>
+          <button id="runPreflight" class="button secondary" type="button">启动前检查</button>
+          <button id="startRunner" class="button" type="button">启动当前模式</button>
+          <button id="stopRunner" class="button secondary" type="button">全部停止</button>
+        </div>
+        <div class="runtime-controls" aria-label="运行控制">
+          <div class="runtime-control"><div><strong class="term" tabindex="0" data-tooltip="高频记录：把 raw/events/signals 等高频数据写入回放目录；暂停不会停网络监控，关键订单账本仍写入。">高频记录（供回放/回测）</strong><small id="collectionStatus">尚未启动</small></div><button id="toggleCollection" class="button secondary" type="button">暂停高频记录</button></div>
+          <div class="runtime-control"><div><strong class="term" tabindex="0" data-tooltip="新订单提交：运行中的临时安全暂停，只阻止后续新订单；不是第二个运行模式。">新订单提交（运行模式内的暂停开关）</strong><small id="tradingStatus">observe 模式不提交真实订单</small></div><button id="toggleTrading" class="button secondary" type="button" disabled>暂停新订单</button></div>
+        </div>
+        <div class="mode-note control-note"><span class="term" tabindex="0" data-tooltip="preflight：启动前自动检查配置、凭据、只读链路和安全闸门；失败时保持关闭。">preflight 启动前检查</span>决定是否允许进入下一阶段。运行模式决定最高权限：observe 只读、canary 受限、live 才具备实盘资格；它不是单笔下单按钮。这里的“新订单提交”是运行中的安全暂停开关，只阻止后续新订单，已有订单仍按对账流程处理。高频记录暂停只降低 raw/events/signals 等写盘，不会停网络监控，也不会丢失 orders/fills/settlements 关键账本。需要全部退出时使用“全部停止”。</div>
+        <div id="accountResult" class="inline-status" role="status">尚未识别账户类型</div>
+        <div id="preflightList" class="preflight-list" aria-live="polite"><div class="empty-state">保存配置后运行启动前检查。</div></div>
+      </details>
+
+      <details class="panel recovery-panel">
+        <summary class="settings-summary">
+          <div><span>订单恢复与对账</span><small>只处理本地待定状态 · 不会创建新订单</small></div>
+          <span id="recoveryBadge" class="tiny-label">正在读取</span>
+        </summary>
+        <div class="recovery-help" role="note">
+          <strong>什么时候需要处理？</strong>
+          <span>仅当状态为 submitting / unknown、官方 Polymarket 订单页和成交记录均查不到该订单时，才可手动关闭本地待定状态。已有官方订单号、部分成交或已成交记录不能使用此操作。</span>
+        </div>
+        <div id="recoveryOrders" class="recovery-orders" aria-live="polite"><div class="empty-state compact">正在读取本地订单状态…</div></div>
+        <div id="recoveryStatus" class="inline-status" role="status"></div>
+      </details>
+
+      <section class="metric-grid" aria-label="关键统计">
+        <article class="metric-card"><span class="metric-label">信号评估</span><strong id="signalsCount">0</strong><small>包括拒绝和合格</small></article>
+        <article class="metric-card"><span class="metric-label">订单记录</span><strong id="ordersCount">0</strong><small>请求 / 响应 / 状态</small></article>
+        <article class="metric-card"><span class="metric-label">纸上成交</span><strong id="paperFillsCount">0</strong><small>模拟 fill · 不发送订单</small></article>
+        <article class="metric-card"><span class="metric-label">实盘成交</span><strong id="liveFillsCount">0</strong><small>真实 fill · 仅官方回报</small></article>
+        <article class="metric-card"><span class="metric-label">纸上结算</span><strong id="paperSettlementsCount">0</strong><small>模拟结果 · 不计真实资金</small></article>
+        <article class="metric-card"><span class="metric-label">实盘结算</span><strong id="liveSettlementsCount">0</strong><small>官方结果与真实净收益</small></article>
+        <article class="metric-card performance-card metric-paper" aria-label="纸上交易表现">
+          <div class="performance-heading"><span class="metric-label">纸上表现 · observe</span><small>模拟成交，不发送订单</small></div>
+          <div class="performance-main"><strong id="paperRealizedPnl" class="pnl-value">0U</strong><small>已结算净盈亏</small></div>
+          <div class="performance-kpis">
+            <div><span>胜率</span><b id="paperWinRate">—</b><small><span id="paperWinsCount">0</span>胜 / <span id="paperLossesCount">0</span>负 · <span id="paperSettledCount">0</span>笔</small></div>
+            <div><span>收益率</span><b id="paperReturnRate">—</b><small>已结算净盈亏 ÷ 已结算成本</small></div>
+            <div><span>未结算</span><b id="paperOpenPositions">0 笔</b><small>仍在等待官方结果</small></div>
+            <div><span>当前预计盈亏</span><b id="paperUnrealizedPnl" class="pnl-value compact">—</b><small id="paperValuationNote">没有未结算仓位</small></div>
+          </div>
+          <div class="direction-breakdown"><span>方向明细</span><small>只统计已结算结果</small><div class="direction-grid"><div><b>UP</b><small>净盈亏 <em id="paperUpPnl">—</em> · 胜率 <em id="paperUpWinRate">—</em> · 收益率 <em id="paperUpReturnRate">—</em> · <em id="paperUpSettledCount">0</em>笔</small></div><div><b>DOWN</b><small>净盈亏 <em id="paperDownPnl">—</em> · 胜率 <em id="paperDownWinRate">—</em> · 收益率 <em id="paperDownReturnRate">—</em> · <em id="paperDownSettledCount">0</em>笔</small></div></div></div>
+        </article>
+        <article class="metric-card performance-card metric-real" aria-label="真实交易表现">
+          <div class="performance-heading"><span class="metric-label">实盘表现 · canary / live</span><small>只统计真实成交与官方结算</small></div>
+          <div class="performance-main"><strong id="realRealizedPnl" class="pnl-value">0U</strong><small>已结算净盈亏</small></div>
+          <div class="performance-kpis">
+            <div><span>胜率</span><b id="realWinRate">—</b><small><span id="realWinsCount">0</span>胜 / <span id="realLossesCount">0</span>负 · <span id="realSettledCount">0</span>笔</small></div>
+            <div><span>收益率</span><b id="realReturnRate">—</b><small>已结算净盈亏 ÷ 已结算成本</small></div>
+            <div><span>未结算</span><b id="realOpenPositions">0 笔</b><small>真实持仓，等待官方结果</small></div>
+            <div><span>当前预计盈亏</span><b id="realUnrealizedPnl" class="pnl-value compact">—</b><small id="realValuationNote">没有未结算仓位</small></div>
+          </div>
+          <div class="direction-breakdown"><span>方向明细</span><small>只统计已结算结果</small><div class="direction-grid"><div><b>UP</b><small>净盈亏 <em id="realUpPnl">—</em> · 胜率 <em id="realUpWinRate">—</em> · 收益率 <em id="realUpReturnRate">—</em> · <em id="realUpSettledCount">0</em>笔</small></div><div><b>DOWN</b><small>净盈亏 <em id="realDownPnl">—</em> · 胜率 <em id="realDownWinRate">—</em> · 收益率 <em id="realDownReturnRate">—</em> · <em id="realDownSettledCount">0</em>笔</small></div></div></div>
+        </article>
+      </section>
+
+      <section class="diagnostics-grid" aria-label="执行诊断">
+        <article class="panel diagnostics-summary">
+          <div class="panel-heading"><div><span>成交诊断</span><small>解释为什么没有成交，不把“未触发”误报成“下单失败”</small></div><span id="diagnosticsWindow" class="tiny-label">最近窗口</span></div>
+          <div class="diagnostic-kpis">
+            <div><span>策略评估</span><strong id="diagEvaluations">0</strong><small>最近记录</small></div>
+            <div><span>条件满足</span><strong id="diagAccepted">0</strong><small>进入执行检查</small></div>
+            <div><span>被拒绝</span><strong id="diagRejected">0</strong><small>策略或盘口门禁</small></div>
+            <div><span>真实成交</span><strong id="diagLiveFills">0</strong><small>官方 live fill</small></div>
+          </div>
+          <div id="diagLatest" class="diagnostic-latest">暂无执行记录</div>
+        </article>
+        <article class="panel diagnostics-reasons">
+          <div class="panel-heading"><div><span>未成交主要原因</span><small>按出现次数排序；每条都来自后台事件</small></div><span id="diagRejectCount" class="tiny-label">0 条</span></div>
+          <div id="diagReasons" class="diagnostic-reasons-list"><div class="empty-state compact">暂无拒绝记录</div></div>
+        </article>
+        <article class="panel diagnostics-runner">
+          <div class="panel-heading"><div><span>运行与停止诊断</span><small>用于判断是没机会，还是 runner 已停止</small></div><span id="diagRunnerStatus" class="tiny-label">未知</span></div>
+          <div class="runner-diagnostic-list">
+            <div><span>最后心跳</span><strong id="diagHeartbeat">—</strong></div>
+            <div><span>本次运行时长</span><strong id="diagUptime">—</strong></div>
+            <div><span>停止/阻断原因</span><strong id="diagStopReason">—</strong></div>
+          </div>
+          <div id="diagStopDetail" class="diagnostic-stop-detail">启动后这里会显示停止、断线或订单闸门原因。</div>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel events-panel">
+          <div class="panel-heading"><div><span>行情动态</span><small>后台事件的简明摘要；原始技术记录仍保存在本地回放目录</small></div><span id="eventCount" class="tiny-label">0 条</span></div>
+          <div id="events" class="events-list"><div class="empty-state">暂无事件，启动 observe 后会在这里显示。</div></div>
+        </article>
+        <aside class="side-stack">
+          <article class="panel safety-panel">
+            <div class="panel-heading"><span>安全闸门</span><span class="lock-icon" aria-hidden="true">LOCKED</span></div>
+            <div class="gate-list">
+              <div><span class="gate-icon pass">✓</span><span>订单通道</span><b>由运行模式管理</b></div>
+              <div><span class="gate-icon pass">✓</span><span>只读行情</span><b>自动开启</b></div>
+              <div><span class="gate-icon pass">✓</span><span>每日风险熔断</span><b>已配置</b></div>
+              <div><span class="gate-icon pass">✓</span><span>密钥文件读取</span><b>禁止</b></div>
+            </div>
+          </article>
+          <article class="panel storage-panel">
+            <div class="panel-heading"><span>记录状态</span><span class="tiny-label">LOCAL</span></div>
+            <div class="storage-value"><strong id="storageSize">0 B</strong><span>实盘目录</span></div>
+            <div class="storage-bar"><span id="storageBar"></span></div>
+            <div class="storage-meta"><span>raw 队列 <b id="queueText">0 / 0</b></span><span>丢弃 <b id="droppedText">0</b></span></div>
+          </article>
+        </aside>
+      </section>
+    </main>
+    <footer><span>本地控制台 · 页面不提供单笔下单按钮</span><span id="footerVersion">数据由 arbitrage-live 提供</span></footer>
+  </div>
+  <dialog id="recoveryDialog" class="recovery-dialog" aria-labelledby="recoveryDialogTitle">
+    <form method="dialog">
+      <h3 id="recoveryDialogTitle">确认官方无订单</h3>
+      <p>只有在 Polymarket 官方订单页和成交记录都查不到该订单时才能继续。此操作仅关闭本地待定状态，不会撤销任何官方订单。</p>
+      <label>输入完整 clientOrderId 进行确认<input id="recoveryConfirmation" autocomplete="off" spellcheck="false" /></label>
+      <input id="recoveryTargetId" type="hidden" />
+      <div id="recoveryDialogStatus" class="inline-status" role="status"></div>
+      <div class="dialog-actions">
+        <button id="cancelRecovery" class="button secondary" type="button">取消</button>
+        <button id="confirmRecovery" class="button danger" type="button" disabled>确认无记录并关闭</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/app.js"></script>
+</body>
+</html>

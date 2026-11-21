@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "quote_down_75_80_90_0_q10",
+      "trigger": "quote",
+      "outcome": "DOWN",
+      "price_min": "0.75",
+      "price_max": "0.80",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 0,
+      "quantity": "10"
+    },
+    {
+      "case_id": "quote_down_80_85_100_0_q10",
+      "trigger": "quote",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "max_remaining_seconds": 100,
+      "min_remaining_seconds": 0,
+      "quantity": "10"
+    },
+    {
+      "case_id": "quote_down_80_85_90_30_q10",
+      "trigger": "quote",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10"
+    },
+    {
+      "case_id": "quote_up_80_85_90_30_q10",
+      "trigger": "quote",
+      "outcome": "UP",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10"
+    },
+    {
+      "case_id": "trade_down_80_85_90_30_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10"
+    },
+    {
+      "case_id": "trade_up_80_85_90_30_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "UP",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10"
+    },
+    {
+      "case_id": "trade_down_80_85_90_10_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 10,
+      "quantity": "10",
+      "min_trade_size": "10"
+    },
+    {
+      "case_id": "trade_up_80_85_90_10_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "UP",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 10,
+      "quantity": "10",
+      "min_trade_size": "10"
+    },
+    {
+      "case_id": "trade_down_80_85_90_30_cap90_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "DOWN",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.90",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10"
+    },
+    {
+      "case_id": "trade_up_80_85_90_30_cap90_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "UP",
+      "price_min": "0.80",
+      "price_max": "0.85",
+      "execution_price_cap": "0.90",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10"
+    }
+  ]
+}

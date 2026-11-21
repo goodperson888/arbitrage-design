@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Realtime Probability Console</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070b14; --panel:#0e1626; --panel2:#111d31; --line:#20304b; --text:#edf4ff; --muted:#8ea1bb; --blue:#49a4ff; --blue2:#1477d4; --amber:#f6b84b; --green:#51d6a5; --red:#ff6e7f; --shadow:0 18px 60px rgba(0,0,0,.36); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 86% -10%, #12355e 0, transparent 35%), var(--bg); color:var(--text); font-family:"Fira Sans","SF Pro Display",Inter,system-ui,sans-serif; letter-spacing:.01em; }
+    .shell { width:min(1180px, calc(100% - 32px)); margin:0 auto; padding:28px 0 44px; }
+    header { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:22px; }
+    .eyebrow { display:flex; align-items:center; gap:10px; color:var(--amber); text-transform:uppercase; font:600 12px "Fira Code",monospace; letter-spacing:.16em; }
+    .pulse { width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 5px rgba(81,214,165,.12); }
+    h1 { margin:8px 0 5px; font-size:clamp(28px,4vw,44px); letter-spacing:-.045em; }
+    .subtitle { color:var(--muted); margin:0; font-size:14px; }
+    .actions { display:flex; align-items:center; gap:10px; }
+    button { min-height:44px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:rgba(17,29,49,.86); padding:0 15px; cursor:pointer; transition:transform .18s ease, border-color .18s ease, background .18s ease; }
+    button:hover { transform:translateY(-1px); border-color:#3e71a5; background:#162945; }
+    button:focus-visible { outline:3px solid rgba(73,164,255,.4); outline-offset:2px; }
+    .status { display:flex; align-items:center; gap:8px; min-height:44px; padding:0 13px; border:1px solid var(--line); border-radius:10px; color:var(--muted); font:500 12px "Fira Code",monospace; }
+    .status.live { color:var(--green); border-color:rgba(81,214,165,.35); }
+    .status.warn { color:var(--amber); border-color:rgba(246,184,75,.35); }
+    .grid { display:grid; grid-template-columns:1.3fr .7fr; gap:16px; }
+    .card { background:linear-gradient(145deg, rgba(17,29,49,.94), rgba(10,18,32,.96)); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+    .hero { padding:24px; min-height:360px; position:relative; overflow:hidden; }
+    .hero:after { content:""; position:absolute; inset:auto -15% -52% 35%; height:280px; background:radial-gradient(ellipse, rgba(73,164,255,.15), transparent 66%); pointer-events:none; }
+    .hero-top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; position:relative; z-index:1; }
+    .label { color:var(--muted); font-size:13px; }
+    .market { margin-top:6px; font:600 17px "Fira Code",monospace; }
+    .signal { padding:9px 13px; border-radius:999px; font:700 12px "Fira Code",monospace; letter-spacing:.1em; background:rgba(73,164,255,.12); color:var(--blue); border:1px solid rgba(73,164,255,.35); }
+    .signal.down { color:var(--red); background:rgba(255,110,127,.1); border-color:rgba(255,110,127,.3); }
+    .prob-row { display:flex; align-items:baseline; gap:12px; margin:50px 0 12px; position:relative; z-index:1; }
+    .prob { font:600 clamp(64px,10vw,108px)/.9 "Fira Code",monospace; letter-spacing:-.1em; }
+    .prob-unit { color:var(--muted); font:500 14px "Fira Code",monospace; }
+    .meter { height:9px; border-radius:99px; background:#1b2940; overflow:hidden; position:relative; z-index:1; }
+    .meter-fill { height:100%; width:50%; border-radius:inherit; background:linear-gradient(90deg,var(--blue2),var(--blue)); transition:width .25s ease; }
+    .meter-fill.down { background:linear-gradient(90deg,#c53f63,var(--red)); }
+    .statline { display:flex; justify-content:space-between; gap:15px; color:var(--muted); font:500 12px "Fira Code",monospace; margin-top:10px; position:relative; z-index:1; }
+    .statline strong { color:var(--text); font-weight:500; }
+    .metrics { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    .metric { padding:17px; min-height:120px; }
+    .metric .label { font-size:12px; }
+    .metric .value { margin-top:15px; font:600 22px "Fira Code",monospace; }
+    .metric .hint { color:var(--muted); font-size:11px; margin-top:7px; }
+    .wide { grid-column:1/-1; padding:20px; }
+    .wide-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .wide h2 { margin:0; font-size:15px; }
+    .source { color:var(--muted); font:500 11px "Fira Code",monospace; }
+    .kv { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; }
+    .kv-item { padding:14px; border-radius:12px; background:rgba(7,11,20,.42); border:1px solid rgba(32,48,75,.75); }
+    .kv-item span { display:block; color:var(--muted); font-size:11px; margin-bottom:8px; }
+    .kv-item strong { font:500 14px "Fira Code",monospace; }
+    .indicator-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .indicator { min-height:88px; padding:13px; border-radius:12px; background:rgba(7,11,20,.42); border:1px solid rgba(32,48,75,.75); }
+    .indicator span { display:block; color:var(--muted); font-size:11px; margin-bottom:8px; }
+    .indicator strong { display:block; font:500 14px "Fira Code",monospace; }
+    .indicator small { display:block; color:var(--muted); font-size:10px; margin-top:6px; }
+    .indicator.up strong { color:var(--green); }
+    .indicator.down strong { color:var(--red); }
+    .fact-status { display:flex; justify-content:space-between; gap:12px; margin-top:13px; color:var(--muted); font:500 11px "Fira Code",monospace; }
+    .helper { margin:12px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }
+    .explain-grid { display:grid; grid-template-columns:1.05fr .95fr; gap:16px; margin-top:16px; }
+    .explain { padding:22px; }
+    .explain h2 { margin:0 0 8px; font-size:17px; }
+    .explain h3 { margin:22px 0 10px; font-size:13px; color:var(--amber); }
+    .explain-copy { color:var(--muted); font-size:13px; line-height:1.7; margin:0; }
+    .formula { margin:16px 0; padding:16px; border:1px solid rgba(73,164,255,.28); background:rgba(20,119,212,.08); border-radius:12px; font:500 14px/1.8 "Fira Code",monospace; overflow:auto; }
+    .term-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .term { padding:12px; border-radius:10px; background:rgba(7,11,20,.44); border:1px solid rgba(32,48,75,.75); }
+    .term span { display:block; color:var(--muted); font-size:11px; margin-bottom:7px; }
+    .term strong { font:500 13px "Fira Code",monospace; }
+    .guide-list { list-style:none; padding:0; margin:14px 0 0; display:grid; gap:10px; }
+    .guide-list li { position:relative; padding:12px 12px 12px 36px; border-radius:10px; background:rgba(7,11,20,.44); color:#c7d5e8; font-size:13px; line-height:1.55; }
+    .guide-list li:before { content:""; position:absolute; left:14px; top:18px; width:8px; height:8px; border-radius:50%; background:var(--blue); box-shadow:0 0 0 4px rgba(73,164,255,.1); }
+    .guide-list li.warn:before { background:var(--red); box-shadow:0 0 0 4px rgba(255,110,127,.1); }
+    .research { margin-top:16px; padding:22px; }
+    .research-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:16px; }
+    .research h2 { margin:0 0 6px; font-size:17px; }
+    .badge { white-space:nowrap; padding:7px 10px; border-radius:999px; border:1px solid rgba(246,184,75,.35); color:var(--amber); font:600 10px "Fira Code",monospace; letter-spacing:.08em; }
+    .feature-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .feature { padding:14px; border-radius:11px; background:rgba(7,11,20,.44); border:1px solid rgba(32,48,75,.75); }
+    .feature strong { display:block; color:var(--text); font-size:13px; margin-bottom:7px; }
+    .feature span { color:var(--muted); font-size:12px; line-height:1.55; }
+    .research-note { margin:14px 0 0; color:var(--muted); font-size:12px; line-height:1.65; }
+    .research-lite { margin-top:16px; padding:22px; }
+    .research-lite h2 { margin:0 0 6px; font-size:17px; }
+    .research-lite table { width:100%; border-collapse:collapse; margin-top:14px; font-size:12px; }
+    .research-lite th, .research-lite td { padding:10px 9px; border-bottom:1px solid rgba(32,48,75,.75); text-align:left; }
+    .research-lite th { color:var(--muted); font-weight:500; }
+    .research-lite td { color:#c7d5e8; font-family:"Fira Code",monospace; }
+    .research-lite .good { color:var(--green); }
+    .research-lite .caution { color:var(--amber); }
+    .reference-pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .reference-pills span { padding:8px 10px; border-radius:999px; background:rgba(7,11,20,.44); border:1px solid rgba(32,48,75,.75); color:var(--muted); font-size:11px; }
+    footer { color:#6e829d; text-align:center; font-size:12px; margin-top:22px; }
+    @media (max-width: 900px) { .indicator-grid { grid-template-columns:repeat(3,1fr); } .kv { grid-template-columns:repeat(3,1fr); } }
+    @media (max-width: 760px) { .shell{width:min(100% - 22px,560px);padding-top:18px;} header{flex-direction:column;} .actions{width:100%;} .status{flex:1;} .grid,.explain-grid{grid-template-columns:1fr;} .hero{min-height:320px;} .kv,.term-grid,.feature-grid,.indicator-grid{grid-template-columns:repeat(2,1fr);} .research-head{flex-direction:column;} .fact-status{flex-direction:column;} .research-lite{padding:18px;} .research-lite table{font-size:11px;} .research-lite th,.research-lite td{padding:8px 5px;} }
+    @media (prefers-reduced-motion: reduce) { *,*:before,*:after{transition:none!important;} }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow"><span class="pulse" id="pulse"></span>实时概率控制台</div>
+        <h1>当前市场状态</h1>
+        <p class="subtitle">不依赖客户历史 · Binance Spot WebSocket · 只读辅助</p>
+      </div>
+      <div class="actions">
+        <div class="status" id="status" aria-live="polite">连接中…</div>
+        <button id="reconnect" type="button">重连行情</button>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="实时市场数据">
+      <article class="card hero">
+        <div class="hero-top"><div><div class="label">当前周期</div><div class="market" id="market">等待行情</div></div><div class="signal" id="signal">NEUTRAL</div></div>
+        <div class="prob-row"><div class="prob" id="prob">50.0%</div><div class="prob-unit">UP 概率</div></div>
+        <div class="meter"><div class="meter-fill" id="meter"></div></div>
+        <div class="statline"><span>DOWN 概率 <strong id="downProb">50.0%</strong></span><span>剩余 <strong id="remaining">—</strong></span></div>
+      </article>
+
+      <div class="metrics">
+        <article class="card metric"><div class="label">距离开盘</div><div class="value" id="distance">—</div><div class="hint">实时相对开盘价</div></article>
+        <article class="card metric"><div class="label">本场振幅</div><div class="value" id="range">—</div><div class="hint">已观测最高—最低</div></article>
+        <article class="card metric"><div class="label">本场最高</div><div class="value" id="high">—</div><div class="hint">Binance Spot</div></article>
+        <article class="card metric"><div class="label">本场最低</div><div class="value" id="low">—</div><div class="hint">Binance Spot</div></article>
+      </div>
+
+      <article class="card wide">
+        <div class="wide-head"><h2>实时输入与质量</h2><div class="source" id="source">Binance Spot @aggTrade + @bookTicker + @depth5</div></div>
+        <div class="kv">
+          <div class="kv-item"><span>当前价格</span><strong id="price">—</strong></div>
+          <div class="kv-item"><span>5秒级动量</span><strong id="momentum">—</strong></div>
+          <div class="kv-item"><span>行情延迟</span><strong id="age">—</strong></div>
+          <div class="kv-item"><span>数据质量</span><strong id="quality">等待数据</strong></div>
+          <div class="kv-item"><span>轻量事实记录</span><strong id="history">—</strong></div>
+        </div>
+        <p class="helper">任一字段显示“—”表示对应事件还未收到或当前窗口没有样本，不等于数值为0；优先以“数据质量”和“盘口年龄”判断能否参考。</p>
+      </article>
+
+      <article class="card wide">
+        <div class="wide-head"><h2>Binance Spot 市场事实</h2><div class="source">不含任何专属下单规则</div></div>
+        <div class="indicator-grid" aria-label="Binance实时盘口和成交事实">
+          <div class="indicator" id="return1Card"><span>1秒价格变化</span><strong id="return1">—</strong><small>短期速度</small></div>
+          <div class="indicator" id="return3Card"><span>3秒价格变化</span><strong id="return3">—</strong><small>短期速度</small></div>
+          <div class="indicator" id="return5Card"><span>5秒价格变化</span><strong id="return5">—</strong><small>短期动量</small></div>
+          <div class="indicator" id="return10Card"><span>10秒价格变化</span><strong id="return10">—</strong><small>短期趋势</small></div>
+          <div class="indicator" id="bookCard"><span>盘口买卖差</span><strong id="bookImbalance">—</strong><small>-1 卖方挂单多 · +1 买方挂单多</small></div>
+          <div class="indicator" id="microCard"><span>微观价格偏移</span><strong id="microEdge">—</strong><small>相对中间价</small></div>
+          <div class="indicator"><span>买卖价差</span><strong id="spread">—</strong><small>一档报价</small></div>
+          <div class="indicator" id="tradeCard"><span>60秒主动成交净方向</span><strong id="tradeImbalance">—</strong><small>负值偏空 · 正值偏多</small></div>
+          <div class="indicator"><span>60秒主动买占比</span><strong id="takerBuyRatio">—</strong><small>成交量占比</small></div>
+          <div class="indicator"><span>10秒成交速度</span><strong id="tradeRate">—</strong><small>笔/秒</small></div>
+          <div class="indicator"><span>买一 / 卖一数量</span><strong id="topSizes">—</strong><small>BTC 数量</small></div>
+          <div class="indicator"><span>盘口年龄</span><strong id="bookAge">—</strong><small>超过2秒标记过期</small></div>
+        </div>
+        <div class="fact-status"><span id="factDirection">方向事实：等待盘口</span><span id="factQuality">盘口质量：等待数据</span></div>
+        <p class="helper">页面展示的是 Binance Spot 的实时事实；本地只按时间桶稀疏记录，默认每10秒一行，不保存每条 WebSocket 消息。</p>
+      </article>
+    </section>
+
+    <section class="explain-grid" aria-label="概率公式与使用方法">
+      <article class="card explain">
+        <h2>实时概率怎么算</h2>
+        <p class="explain-copy">程序只使用当前市场和最近60秒行情，不读取任何客户历史数据。先把价格距离、短期漂移、实时波动和剩余时间统一到一个标准化分数。</p>
+        <div class="formula" aria-label="概率计算公式">
+          d = ln(当前价 ÷ 开盘价)<br>
+          z = (d + μ × T) ÷ (σ × √max(T,1))<br>
+          P(UP) = Φ(z)　　P(DOWN) = 1 − P(UP)
+        </div>
+        <p class="explain-copy">T 是剩余秒数；μ 是最近60秒平均对数收益/秒；σ 是最近60秒每平方根秒波动；Φ 是标准正态分布累计函数。结果限制在2%–98%，避免把短期模型误显示成必胜。</p>
+        <h3>当前公式输入</h3>
+        <div class="term-grid">
+          <div class="term"><span>d · 对数距离</span><strong id="termD">—</strong></div>
+          <div class="term"><span>μ · 漂移/秒</span><strong id="termMu">—</strong></div>
+          <div class="term"><span>σ · 波动/√秒</span><strong id="termSigma">—</strong></div>
+          <div class="term"><span>z · 标准化优势</span><strong id="termZ">—</strong></div>
+        </div>
+      </article>
+
+      <article class="card explain">
+        <h2>如何看、如何用</h2>
+        <p class="explain-copy">概率高只代表当前参考价更偏向某个方向，不等于这笔交易有正收益。还必须和预测平台的实际可成交价比较。</p>
+        <div class="formula">理论边际 ≈ 模型方向概率 − 平台实际买入价 − 手续费与滑点</div>
+        <ul class="guide-list">
+          <li>距离开盘相对实时波动越大、剩余时间越少且5秒动量同向，当前方向通常更稳。</li>
+          <li>数据延迟不超过2秒、平台盘口新鲜、买入深度足够，模型概率才具有可执行意义。</li>
+          <li class="warn">价格接近开盘、波动突然放大、5秒明显反转或 Binance 与平台结算参考源背离时，应降低信任。</li>
+          <li class="warn">如果模型概率没有显著高于实际买价和成本，即使方向胜率较高，也不代表值得入场。</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card research-lite" aria-label="Binance Spot历史参考">
+      <h2>Binance Spot 历史参考（仅作辅助）</h2>
+      <p class="explain-copy">下面是已有时间外样本对“价格相对本场开盘的距离”这一通用指标的粗分层。它不是当前主策略，也不是保证胜率；样本只用于帮助理解时间和距离如何影响方向判断。</p>
+      <table>
+        <thead><tr><th>剩余时间</th><th>方向判断命中率</th><th>可参考的距离分层</th><th>解释</th></tr></thead>
+        <tbody>
+          <tr><td>120秒</td><td class="good">80.0%</td><td>距离正负（0 bps）</td><td>较早，噪声较多</td></tr>
+          <tr><td>90秒</td><td class="good">83.4%</td><td>距离正负（0 bps）</td><td>方向开始分离</td></tr>
+          <tr><td>60秒</td><td class="good">88.9%</td><td>正向距离 +5–10 bps：98.0%（n=50）</td><td>距离明显时更有区分度</td></tr>
+          <tr><td>30秒</td><td class="good">93.3%</td><td>正向距离 +5–10 bps：100.0%（n=64）</td><td>临近收盘，方向更清晰</td></tr>
+        </tbody>
+      </table>
+      <div class="reference-pills">
+        <span>距离 = (当前价 ÷ 开盘价 − 1) × 10,000 bps</span>
+        <span>正值偏 UP · 负值偏 DOWN</span>
+        <span>DOWN 方向需读取对应的负距离分层</span>
+        <span>距离越大不代表一定能成交或一定盈利</span>
+        <span>盘口/滑点/结算源差异仍需单独检查</span>
+      </div>
+      <p class="research-note">研究参考来自历史 Binance Spot 距离×剩余时间报告；小样本分层只用于观察，不自动转换为下单门槛。新用户应先看实时概率、延迟和盘口质量，再自行判断。</p>
+    </section>
+
+    <section class="card research" aria-label="指标历史研究提示">
+      <div class="research-head">
+        <div><h2>这个实时指标的历史研究提示</h2><p class="explain-copy">只保留与当前概率计算直接相关的特征，不展示任何其他策略的下单门槛、价格区间或收益记录。</p></div>
+        <div class="badge">仅作参考</div>
+      </div>
+      <div class="feature-grid">
+        <div class="feature"><strong>标准化距离更大</strong><span>当前价格距离开盘越远，并且超过同期波动噪声，方向概率通常更容易拉开。</span></div>
+        <div class="feature"><strong>剩余时间更短</strong><span>在其他条件不变时，剩余时间减少会放大当前距离对最终方向的影响。</span></div>
+        <div class="feature"><strong>短期动量同向</strong><span>最近几秒的价格变化与当前方向一致，通常比瞬时反向更稳定。</span></div>
+        <div class="feature"><strong>波动没有突然放大</strong><span>波动率突然上升时，模型会把概率向50%收缩，避免把噪声当成确定方向。</span></div>
+        <div class="feature"><strong>数据保持新鲜</strong><span>行情延迟超过2秒会标记为 stale，并关闭基础实时门禁。</span></div>
+        <div class="feature"><strong>参考源一致</strong><span>Binance 只是参考源；如果平台用其他结算源，需额外检查两者距离和延迟。</span></div>
+      </div>
+      <p class="research-note">这些是历史样本中与“距离—时间—动量—波动”指标相关的方向性提示，不是任何平台的保证胜率，也不代表自动下单条件。</p>
+    </section>
+    <footer>概率是基于当前参考价格、剩余时间和短期波动的理论估计，不代表官方结算保证，也不执行交易。</footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const pct = (value) => `${(Number(value || 0) * 100).toFixed(1)}%`;
+    const bps = (value) => `${Number(value || 0).toFixed(1)} bps`;
+    const signedBps = (value) => value == null ? '—' : `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)} bps`;
+    const signedRatio = (value) => value == null ? '—' : `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}`;
+    const ratioPct = (value) => value == null ? '—' : `${(Number(value) * 100).toFixed(1)}%`;
+    const price = (value) => value == null ? '—' : Number(value).toLocaleString(undefined, {maximumFractionDigits: 2});
+    function setDirectionClass(id, value) {
+      const node = $(id);
+      node.classList.remove('up', 'down');
+      if (value > 0) node.classList.add('up');
+      if (value < 0) node.classList.add('down');
+    }
+    function directionText(value, positive = 'UP', negative = 'DOWN') {
+      if (value == null || Number(value) === 0) return '中性';
+      return Number(value) > 0 ? positive : negative;
+    }
+    function render(state) {
+      const status = $('status');
+      status.textContent = state.status === 'live' ? '行情在线' : state.status === 'reconnecting' ? '正在重连' : state.status === 'dependency_error' ? '缺少依赖' : state.status;
+      status.className = `status ${state.status === 'live' ? 'live' : 'warn'}`;
+      const history = state.history || {};
+      $('history').textContent = history.records_written == null ? '未开始' : `${history.records_written} 行`;
+      $('history').title = history.path ? `文件：${history.path} · 每${history.interval_seconds || 10}秒最多一行` : '轻量事实记录';
+      const item = state.latest;
+      if (!item) { $('source').textContent = state.source || 'Binance Spot @aggTrade'; return; }
+      $('market').textContent = `${state.symbol} · ${state.interval_seconds}s`;
+      $('signal').textContent = item.signal;
+      $('signal').className = `signal ${item.signal === 'DOWN' ? 'down' : ''}`;
+      $('prob').textContent = pct(item.probability_up);
+      $('downProb').textContent = pct(item.probability_down);
+      $('meter').style.width = `${Number(item.probability_up || .5) * 100}%`;
+      $('meter').className = `meter-fill ${item.signal === 'DOWN' ? 'down' : ''}`;
+      $('remaining').textContent = `${Number(item.remaining_seconds || 0).toFixed(1)}s`;
+      $('distance').textContent = bps(item.distance_from_open_bps);
+      $('range').textContent = bps(item.range_bps);
+      $('high').textContent = price(item.session_high);
+      $('low').textContent = price(item.session_low);
+      $('price').textContent = price(item.current_price);
+      $('momentum').textContent = bps(item.momentum_bps);
+      $('age').textContent = state.last_message_age_seconds == null ? '—' : `${(state.last_message_age_seconds * 1000).toFixed(0)} ms`;
+      const qualityLabels = {good:'正常', warming_up:'预热中', stale:'行情过期', book_stale:'盘口过期', closed:'本场已结束'};
+      $('quality').textContent = qualityLabels[item.data_quality] || item.data_quality || '等待数据';
+      $('termD').textContent = Number(item.log_distance || 0).toFixed(7);
+      $('termMu').textContent = `${Number(item.drift_bps_per_second || 0).toFixed(4)} bps/s`;
+      $('termSigma').textContent = `${Number(item.volatility_bps_per_sqrt_second || 0).toFixed(4)} bps/√s`;
+      $('termZ').textContent = Number(item.z_score || 0).toFixed(3);
+      $('return1').textContent = signedBps(item.return_1s_bps);
+      $('return3').textContent = signedBps(item.return_3s_bps);
+      $('return5').textContent = signedBps(item.return_5s_bps);
+      $('return10').textContent = signedBps(item.return_10s_bps);
+      $('bookImbalance').textContent = signedRatio(item.book_imbalance);
+      $('microEdge').textContent = signedBps(item.microprice_edge_bps);
+      $('spread').textContent = item.spread_bps == null ? '—' : `${Number(item.spread_bps).toFixed(2)} bps`;
+      $('tradeImbalance').textContent = signedRatio(item.trade_imbalance_60s);
+      $('takerBuyRatio').textContent = ratioPct(item.taker_buy_ratio_60s);
+      $('tradeRate').textContent = item.trade_rate_10s == null ? '—' : Number(item.trade_rate_10s).toFixed(1);
+      $('topSizes').textContent = item.best_bid_size == null || item.best_ask_size == null ? '—' : `${Number(item.best_bid_size).toFixed(3)} / ${Number(item.best_ask_size).toFixed(3)}`;
+      $('bookAge').textContent = item.book_age_seconds == null ? '—' : `${(Number(item.book_age_seconds) * 1000).toFixed(0)} ms`;
+      setDirectionClass('return1Card', Number(item.return_1s_bps));
+      setDirectionClass('return3Card', Number(item.return_3s_bps));
+      setDirectionClass('return5Card', Number(item.return_5s_bps));
+      setDirectionClass('return10Card', Number(item.return_10s_bps));
+      setDirectionClass('bookCard', Number(item.book_imbalance));
+      setDirectionClass('microCard', Number(item.microprice_edge_bps));
+      setDirectionClass('tradeCard', Number(item.trade_imbalance_60s));
+      const aligned = [item.book_imbalance, item.microprice_edge_bps, item.trade_imbalance_60s].filter((value) => value != null);
+      const upVotes = aligned.filter((value) => Number(value) > 0).length;
+      const downVotes = aligned.filter((value) => Number(value) < 0).length;
+      const factLabel = upVotes === downVotes ? '中性/分歧' : upVotes > downVotes ? '偏多（UP）' : '偏空（DOWN）';
+      $('factDirection').textContent = aligned.length ? `方向事实：${factLabel} · ${Math.max(upVotes, downVotes)}/${aligned.length}项` : '方向事实：等待盘口和成交';
+      $('factQuality').textContent = item.book_stale ? '盘口质量：过期' : item.book_age_seconds == null ? '盘口质量：等待数据' : `盘口质量：新鲜 · ${item.trade_count_60s || 0}笔/60秒`;
+      $('pulse').style.background = state.status === 'live' ? 'var(--green)' : 'var(--amber)';
+    }
+    async function refresh() { try { render(await (await fetch('/api/state', {cache:'no-store'})).json()); } catch (error) { $('status').textContent = '页面无法连接本地服务'; $('status').className = 'status warn'; } }
+    $('reconnect').addEventListener('click', async () => { await fetch('/api/reconnect', {method:'POST'}); refresh(); });
+    refresh(); setInterval(refresh, 1000);
+  </script>
+</body>
+</html>

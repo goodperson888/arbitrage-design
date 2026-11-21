@@ -1,0 +1,17 @@
+[project]
+name = "generic-realtime-probability"
+version = "0.1.0"
+description = "History-free real-time price-distance probability calculator"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+live = ["websockets>=12.0", "python-socks[asyncio]>=2.4"]
+
+[project.scripts]
+realtime-probability = "realtime_probability.cli:main"
+realtime-probability-web = "realtime_probability.web:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

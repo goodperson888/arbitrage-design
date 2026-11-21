@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.arbitrage-research/contracts/market-event-v1.schema.json",
+  "title": "MarketEventEnvelopeV1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "eventType",
+    "venue",
+    "marketId",
+    "sourceTimeUs",
+    "receivedTimeUs",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "eventId": { "type": "string" },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "MARKET_DEFINITION",
+        "MARKET_RULE",
+        "FEE_SCHEDULE",
+        "ORDERBOOK_SNAPSHOT",
+        "ORDERBOOK_DELTA",
+        "PRICE_QUOTE",
+        "TRADE",
+        "REFERENCE_PRICE",
+        "MARKET_STATUS",
+        "SETTLEMENT",
+        "DATA_GAP"
+      ]
+    },
+    "venue": { "type": "string" },
+    "marketId": { "type": "string" },
+    "instrumentId": { "type": "string" },
+    "outcome": { "type": "string" },
+    "sourceTimeUs": {
+      "description": "Exchange or source timestamp in Unix microseconds.",
+      "type": ["integer", "string"]
+    },
+    "receivedTimeUs": {
+      "description": "Local collector timestamp in Unix microseconds.",
+      "type": ["integer", "string"]
+    },
+    "sequence": { "type": ["integer", "string"] },
+    "source": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "collector": { "type": "string" },
+        "connectorVersion": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

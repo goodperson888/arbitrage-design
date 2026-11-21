@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "validation_id": "btc_5m_binance_hyperliquid_deribit_v1",
+  "paper_only": true,
+  "data_dir": "data/cross_market_validation",
+  "observation_remaining_seconds": [240, 180, 120, 100, 90, 60, 30],
+  "observation_tolerance_seconds": 2.5,
+  "venue_snapshot_interval_ms": 1000,
+  "memory_window_seconds": 600,
+  "discovery_interval_seconds": 2.0,
+  "settlement_interval_seconds": 5.0,
+  "store_raw_messages": false,
+  "raw_sample_interval_ms": 1000,
+  "lead_lag_interval_ms": 100,
+  "option_strikes_each_side": 12
+}

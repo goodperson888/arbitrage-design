@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# Persistent controller for the three research-only monitors.
+# Usage: arb-monitor {start|stop|restart|status|attach} [paper|cross|cross15|gate|all]
+
+set -u
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
+if [ -x "$PROJECT_ROOT/.venv/bin/python3" ]; then
+  DEFAULT_PYTHON="$PROJECT_ROOT/.venv/bin/python3"
+else
+  DEFAULT_PYTHON="/Users/laochen/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+fi
+PYTHON_BIN="${ARB_RESEARCH_PYTHON:-$DEFAULT_PYTHON}"
+NODE_BIN="${ARB_RESEARCH_NODE:-/Users/laochen/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node}"
+PROXY_URL="${ARB_RESEARCH_PROXY:-http://127.0.0.1:7890}"
+PYTHONPATH_VALUE="$PROJECT_ROOT/src"
+
+usage() {
+  cat <<'EOF'
+用法：
+  ./arb-monitor start [all|paper|cross|cross15|gate]
+  ./arb-monitor stop [all|paper|cross|cross15|gate]
+  ./arb-monitor restart [all|paper|cross|cross15|gate]
+  ./arb-monitor status
+  ./arb-monitor compact              # 预览可无损压缩的历史日志
+  ./arb-monitor compact --apply      # 校验后替换为gzip，不改变记录内容
+  ./arb-monitor attach [paper|cross|gate]
+
+名称：paper=Polymarket纸上交易，cross=5分钟跨市场采集，cross15=15分钟跨市场采集，gate=Gate辅助监控。
+环境变量：ARB_RESEARCH_PROXY、ARB_RESEARCH_PYTHON、ARB_RESEARCH_NODE。
+EOF
+}
+
+session_name() {
+  case "$1" in
+    paper) printf '%s' arb-paper ;;
+    cross) printf '%s' arb-cross ;;
+    cross15) printf '%s' arb-cross15 ;;
+    gate) printf '%s' arb-gate ;;
+    *) return 1 ;;
+  esac
+}
+
+session_exists() {
+  screen -ls 2>/dev/null | grep -Eq "[.]$1[[:space:]]"
+}
+
+monitor_script() {
+  case "$1" in
+    paper) printf '%s' "$PROJECT_ROOT/scripts/monitor/run_research_paper_monitor.py" ;;
+    cross) printf '%s' "$PROJECT_ROOT/scripts/monitor/run_cross_market_5m_validation.py" ;;
+    cross15) printf '%s' "$PROJECT_ROOT/scripts/monitor/run_cross_market_15m_validation.py" ;;
+    gate) printf '%s' "$PROJECT_ROOT/scripts/monitor/run_gate_direct_monitor.mjs" ;;
+    *) return 1 ;;
+  esac
+}
+
+process_pids() {
+  local kind="$1" needle pid command_name
+  needle="$(monitor_script "$kind")" || return 1
+  # screen/login also carry the Python command in their arguments. Signalling
+  # those wrappers first closes the terminal before Python can finish gzip.
+  # Stop only the interpreter; remove its screen session after it has exited.
+  for pid in $(pgrep -f "$needle" 2>/dev/null); do
+    read -r command_name < <(ps -p "$pid" -o ucomm= 2>/dev/null) || continue
+    case "$command_name" in
+      python|python[0-9]*|Python|node) printf '%s\n' "$pid" ;;
+    esac
+  done
+}
+
+process_exists() {
+  [ -n "$(process_pids "$1")" ]
+}
+
+start_one() {
+  local kind="$1" name
+  name="$(session_name "$kind")" || { echo "未知监控器：$kind" >&2; return 2; }
+  if session_exists "$name"; then
+    echo "${kind} 已在运行（screen 会话：${name}）"
+    return 0
+  fi
+  if process_exists "$kind"; then
+    echo "${kind} 已在运行，但不在可进入的 screen 会话中；不会重复启动"
+    return 0
+  fi
+  case "$kind" in
+    paper)
+      screen -dmS "$name" env PYTHONPATH="$PYTHONPATH_VALUE" "$PYTHON_BIN" "$PROJECT_ROOT/scripts/monitor/run_research_paper_monitor.py" --proxy "$PROXY_URL" --port 8765
+      ;;
+    cross)
+      screen -dmS "$name" env PYTHONPATH="$PYTHONPATH_VALUE" "$PYTHON_BIN" "$PROJECT_ROOT/scripts/monitor/run_cross_market_5m_validation.py" --proxy "$PROXY_URL"
+      ;;
+    cross15)
+      screen -dmS "$name" env PYTHONPATH="$PYTHONPATH_VALUE" "$PYTHON_BIN" "$PROJECT_ROOT/scripts/monitor/run_cross_market_15m_validation.py" --proxy "$PROXY_URL"
+      ;;
+    gate)
+      screen -dmS "$name" "$NODE_BIN" "$PROJECT_ROOT/scripts/monitor/run_gate_direct_monitor.mjs" --snapshot-seconds 10 --max-levels 3
+      ;;
+  esac
+  echo "已启动 ${kind}（screen 会话：${name}）"
+}
+
+stop_one() {
+  local kind="$1" name
+  name="$(session_name "$kind")" || { echo "未知监控器：$kind" >&2; return 2; }
+  # 先让采集器完成账本刷新和gzip收尾，避免先关screen导致日志截断。
+  local pid
+  for pid in $(process_pids "$kind"); do
+    kill "$pid" 2>/dev/null || true
+  done
+  local attempt=0
+  while process_exists "$kind" && [ "$attempt" -lt 150 ]; do
+    sleep 0.2
+    attempt=$((attempt + 1))
+    if [ "$attempt" -eq 50 ]; then
+      echo "${kind} 正在完成当前网络请求与账本收尾，继续等待正常退出"
+    fi
+  done
+  if process_exists "$kind"; then
+    echo "${kind} 仍在收尾，未强制关闭；请用 status 检查" >&2
+    return 1
+  fi
+  if session_exists "$name"; then
+    screen -S "$name" -X quit
+  fi
+  if session_exists "$name" || process_exists "$kind"; then
+    echo "停止 ${kind} 仍在收尾，请稍后用 status 复查"
+  elif [ -n "${name:-}" ]; then
+    echo "已停止 ${kind}（${name}）；数据目录保留"
+  fi
+}
+
+for_each_kind() {
+  local action="$1" target="${2:-all}" kind
+  if [ "$target" = all ]; then
+    for kind in paper cross cross15 gate; do "$action" "$kind" || return; done
+  else
+    "$action" "$target"
+  fi
+}
+
+status() {
+  echo 'screen 会话：'
+  screen -ls 2>/dev/null | grep -E 'arb-(paper|cross|cross15|gate)' || echo '  （无）'
+  echo
+  "$PYTHON_BIN" - "$PROJECT_ROOT" <<'PY'
+import json, pathlib, sys, time
+root = pathlib.Path(sys.argv[1])
+paths = {
+    "paper": root / "data/live_monitor/state/latest.json",
+    "cross": root / "data/cross_market_validation/state/latest.json",
+    "cross15": root / "data/cross_market_validation_15m/state/latest.json",
+    "gate": root / "data/gate_monitor/state/latest.json",
+}
+now = time.time() * 1_000_000
+for name, path in paths.items():
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        service = data.get("service", {})
+        stamp = service.get("lastMessageAtUs") or service.get("lastCaptureAtUs") or data.get("generatedAtUs")
+        age = "?" if not stamp else f"{max(0, now - float(stamp))/1_000_000:.1f}s前"
+        status = service.get("status", "?")
+        if stamp and status in {"running", "live"} and (now - float(stamp)) > 120_000_000:
+            status = "stale"
+        print(f"{name:5} status={status}  更新={age}  error={service.get('lastError') or '-'}")
+    except FileNotFoundError:
+        print(f"{name:5} 状态文件不存在")
+    except Exception as exc:
+        print(f"{name:5} 状态读取失败：{exc}")
+PY
+}
+
+action="${1:-}"
+target="${2:-all}"
+case "$action" in
+  start) for_each_kind start_one "$target" ;;
+  stop) for_each_kind stop_one "$target" ;;
+  restart) for_each_kind stop_one "$target" && sleep 1 && for_each_kind start_one "$target" ;;
+  status) status ;;
+  compact)
+    case "${2:-}" in
+      ''|--apply) ;;
+      *) echo "用法：./arb-monitor compact [--apply]" >&2; exit 2 ;;
+    esac
+    compact_args=()
+    if [ "${2:-}" = --apply ]; then compact_args=(--apply); fi
+    exec env PYTHONPATH="$PYTHONPATH_VALUE" "$PYTHON_BIN" "$PROJECT_ROOT/scripts/utils/compress_monitor_logs.py" --data-dir "$PROJECT_ROOT/data/live_monitor" "${compact_args[@]}"
+    ;;
+  attach)
+    name="$(session_name "$target")" || { usage; exit 2; }
+    exec screen -r "$name"
+    ;;
+  -h|--help|help|'') usage ;;
+  *) echo "未知命令：$action" >&2; usage; exit 2 ;;
+esac

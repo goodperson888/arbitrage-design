@@ -1,0 +1,138 @@
+{
+  "experiments": [
+    {
+      "experiment_id": "59dc65cc-2244-4813-a0a9-b40edb0df5a5",
+      "experiment_name": "test_parameter_sweep",
+      "description": "Test parameter sweep with example data",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "examples/prediction_events.ndjson",
+      "created_at": "2026-08-20T07:48:39.800460+00:00",
+      "config_hash": "7e1bdd5ad1a5e7c6fb3d1017727b3df5",
+      "status": "created",
+      "result_file": null
+    },
+    {
+      "experiment_id": "e3c6cd41-63f8-4e08-9f0c-6f4be2ed1af3",
+      "experiment_name": "quick_test",
+      "description": "Quick test with reduced parameters",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "examples/prediction_events.ndjson",
+      "created_at": "2026-08-20T07:49:37.292680+00:00",
+      "config_hash": "a4ff0b80b53a6d736d6d79ab4be58fda",
+      "status": "completed",
+      "result_file": "experiments/results/experiment_e3c6cd41/experiment_result.json"
+    },
+    {
+      "experiment_id": "ccab1606-0b70-4e53-a326-69d5c31deb0c",
+      "experiment_name": "parameter_sweep_default",
+      "description": "使用默认参数空间的完整扫描",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/data/events.ndjson",
+      "created_at": "2026-08-20T08:13:00.582892+00:00",
+      "config_hash": "8c2007b36276ebc425b218137be51c62",
+      "status": "created",
+      "result_file": null
+    },
+    {
+      "experiment_id": "3a17dbaa-3f8f-412b-af75-95ad07b7018d",
+      "experiment_name": "parameter_sweep_test",
+      "description": "使用测试参数空间的快速验证",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/data/events.ndjson",
+      "created_at": "2026-08-20T08:13:00.583453+00:00",
+      "config_hash": "395fdf3eefcd7f88b53cbdd76f00c968",
+      "status": "created",
+      "result_file": null
+    },
+    {
+      "experiment_id": "0b4d1f78-801f-4f1b-ae93-489ba0a6813c",
+      "experiment_name": "parameter_sweep_custom",
+      "description": "自定义参数空间的针对性扫描",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/data/events.ndjson",
+      "created_at": "2026-08-20T08:13:00.583846+00:00",
+      "config_hash": "4a7dc17e8e45f940700f254a63f253c0",
+      "status": "created",
+      "result_file": null
+    },
+    {
+      "experiment_id": "c56b46fb-9bd2-4dc2-b56b-4741afa01cdc",
+      "experiment_name": "parameter_sweep_test_fixed",
+      "description": "修复路径后的测试实验",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/examples/prediction_events.ndjson",
+      "created_at": "2026-08-20T08:13:48.290655+00:00",
+      "config_hash": "2ab36b2d50642dc5cf3ed9eac314440e",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_c56b46fb/experiment_result.json"
+    },
+    {
+      "experiment_id": "08a04671-5be8-4ec5-963c-dcd9cd8324e8",
+      "experiment_name": "parameter_sweep_full_2min_70_88",
+      "description": "完整参数扫描：最后2-3分钟，70-88价格范围",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/examples/prediction_events.ndjson",
+      "created_at": "2026-08-20T08:13:48.300700+00:00",
+      "config_hash": "22f49ac66fb93f877bc531acfbdbcd66",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_08a04671/experiment_result.json"
+    },
+    {
+      "experiment_id": "fb896627-d770-41fb-b688-ceb7d394e8f8",
+      "experiment_name": "strategy_2min_3min_70_88",
+      "description": "验证2-3分钟、70-88价格范围的下单策略胜率和盈利",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/examples/prediction_events.ndjson",
+      "created_at": "2026-08-20T08:34:10.882996+00:00",
+      "config_hash": "41bea4849f7f46df9e4c148df9f97098",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_fb896627/experiment_result.json"
+    },
+    {
+      "experiment_id": "e9aae8f8-9f99-4abf-af69-10597b8406e5",
+      "experiment_name": "btc_eth_5min_strategy_validation",
+      "description": "使用BTC/ETH模拟数据验证2-3分钟、70-88价格范围策略",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/data/btc_eth_5min_sample.ndjson",
+      "created_at": "2026-08-20T08:59:23.937696+00:00",
+      "config_hash": "8ec81479944021189fec9115f71c9a8b",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_e9aae8f8/experiment_result.json"
+    },
+    {
+      "experiment_id": "90424c31-643c-43da-8e31-8f8974f4914b",
+      "experiment_name": "btc_5m_real_data_2min_vs_3min",
+      "description": "使用 5 分钟市场真实数据对比 2 分钟 vs 3 分钟进场策略（价格 0.70-0.88）",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/btc_5m_full.ndjson",
+      "created_at": "2026-08-20T10:39:55.542523+00:00",
+      "config_hash": "5499424ab95d20fd80a40809e01c17ac",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_90424c31/experiment_result.json"
+    },
+    {
+      "experiment_id": "ebfb1aab-627d-456b-9ae1-956c3ea299ad",
+      "experiment_name": "btc_5m_9markets_2min_vs_3min",
+      "description": "使用 5 分钟市场真实数据对比 2 分钟 vs 3 分钟进场策略（价格 0.70-0.88）",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/btc_5m_9markets_full.ndjson",
+      "created_at": "2026-08-20T11:12:03.187964+00:00",
+      "config_hash": "6e57b4c5fb0de29735766397a51299bd",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_ebfb1aab/experiment_result.json"
+    },
+    {
+      "experiment_id": "af2b6d2b-0b00-48b6-a78d-e4a1a4ef816c",
+      "experiment_name": "btc_5m_9markets_correct_fee",
+      "description": "使用 5 分钟市场真实数据对比 2 分钟 vs 3 分钟进场策略（价格 0.70-0.88）",
+      "strategy_type": "prediction_last_window_threshold",
+      "data_source": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/btc_5m_9markets_full.ndjson",
+      "created_at": "2026-08-20T11:16:17.004771+00:00",
+      "config_hash": "d82b4fe59704eb152aeba563fe2f3b7b",
+      "status": "completed",
+      "result_file": "/Users/laochen/Documents/lianghua/arbitrage-design/arbitrage-research/experiments/results/experiment_af2b6d2b/experiment_result.json"
+    }
+  ],
+  "total_count": 12,
+  "last_updated": "2026-08-20T11:16:18.074104+00:00"
+}

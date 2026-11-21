@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>BTC 5m 研究监控</title>
+    <link rel="stylesheet" href="/monitor.css">
+    <script src="/monitor.js" defer></script>
+    <script src="/candidates.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 17.5 9 12l3 3 7-8" />
+          <path d="M15 7h4v4" />
+        </svg>
+        <div>
+          <p class="eyebrow">ARBITRAGE RESEARCH</p>
+          <h1>BTC 5分钟 · 纸上交易监控</h1>
+        </div>
+      </div>
+      <div class="connection" aria-live="polite">
+        <span id="status-dot" class="status-dot" data-tone="waiting"></span>
+        <div>
+          <span id="status-label" class="status-label">正在启动</span>
+          <span id="last-message" class="status-detail">等待官方数据</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="dashboard" tabindex="-1">
+      <p id="storage-status" class="storage-status">正在检查磁盘余量</p>
+      <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
+      <nav class="monitor-tabs" role="tablist" aria-label="纸上交易分组">
+        <button id="tab-original" role="tab" aria-selected="true" aria-controls="panel-original" type="button">原策略监控</button>
+        <button id="tab-candidates" role="tab" aria-selected="false" aria-controls="panel-candidates" tabindex="-1" type="button">候选策略 · 并行验证</button>
+      </nav>
+      <div id="panel-original" class="monitor-pane" role="tabpanel" aria-labelledby="tab-original">
+      <section class="hero-grid" aria-labelledby="market-heading">
+        <article class="panel market-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">当前市场</p>
+              <h2 id="market-heading">等待 BTC 5分钟市场</h2>
+            </div>
+            <div class="countdown-wrap">
+              <span class="countdown-label">距离结算</span>
+              <strong id="countdown" class="countdown">--:--</strong>
+            </div>
+          </div>
+          <p id="market-slug" class="market-slug">尚未发现市场</p>
+          <div class="price-grid">
+            <div class="price-card">
+              <div class="price-card-top"><span>UP</span><span id="up-age">盘口 --</span></div>
+              <strong id="up-ask">--</strong>
+              <p>卖一 <span id="up-size">--</span> 份</p>
+            </div>
+            <div class="price-card featured">
+              <div class="price-card-top"><span>DOWN</span><span id="down-age">盘口 --</span></div>
+              <strong id="down-ask">--</strong>
+              <p>卖一 <span id="down-size">--</span> 份</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel strategy-panel">
+          <div class="panel-heading compact">
+            <div>
+              <p class="section-label">研究信号</p>
+              <h2>UP / DOWN 同规则确认</h2>
+            </div>
+            <span class="mode-badge">仅纸上交易</span>
+          </div>
+          <ol class="rules" aria-label="策略触发条件">
+            <li><span>01</span><div><strong>方向：UP、DOWN 分开统计</strong><small>两个方向使用完全相同的规则，不合并胜率</small></div></li>
+            <li><span>02</span><div><strong>剩余 90–30 秒</strong><small>排除最后30秒</small></div></li>
+            <li><span>03</span><div><strong>对应方向真实主动买入 ≥10份</strong><small>UP / DOWN 分别判断，只接受官方主动 BUY</small></div></li>
+            <li><span>04</span><div><strong>实际成交 VWAP 0.80–0.85</strong><small>按当前卖盘逐档消耗10份计算</small></div></li>
+            <li><span>05</span><div><strong>对应方向入场前5秒动量 ≥0.01</strong><small>该方向最优卖价相对约5秒前上涨至少0.01</small></div></li>
+            <li><span>06</span><div><strong>卖盘足量且不陈旧</strong><small>0.85价格上限内足够10份，盘口不超过2秒</small></div></li>
+          </ol>
+          <div id="latest-signal" class="signal-summary" data-tone="neutral">
+            <span class="signal-kicker">最近信号</span>
+            <strong>尚无 UP / DOWN 成交事件</strong>
+            <small>所有未触发和未成交原因都会保存</small>
+          </div>
+        </article>
+      </section>
+
+      <section class="metrics" aria-label="纸上交易统计">
+        <article class="metric"><span>已结算</span><strong id="closed-count">0</strong><small>纸上交易</small></article>
+        <article class="metric"><span>胜率</span><strong id="win-rate">0.0%</strong><small id="win-loss">0 胜 / 0 负</small></article>
+        <article class="metric"><span>累计净收益</span><strong id="total-pnl">$0.00</strong><small>含模拟手续费</small></article>
+        <article class="metric"><span>有效信号</span><strong id="qualified-count">0</strong><small id="no-fill-count">0 次未成交</small></article>
+        <article class="metric"><span>原始消息</span><strong id="raw-count">0</strong><small>追加式归档</small></article>
+      </section>
+
+      <section class="outcome-breakdown" aria-label="分方向纸上统计">
+        <article class="panel outcome-stat" data-outcome="UP">
+          <div><span class="outcome-label">UP</span><small>同规则独立统计</small></div>
+          <dl>
+            <div><dt>评估 / 有效</dt><dd><span id="up-evaluations">0</span> / <span id="up-qualified">0</span></dd></div>
+            <div><dt>成交 / 未成交</dt><dd><span id="up-fills">0</span> / <span id="up-no-fills">0</span></dd></div>
+            <div><dt>胜负 / 胜率</dt><dd><span id="up-win-loss">0–0</span> / <span id="up-win-rate">0.0%</span></dd></div>
+            <div><dt>净收益</dt><dd id="up-pnl">+$0.00</dd></div>
+          </dl>
+        </article>
+        <article class="panel outcome-stat" data-outcome="DOWN">
+          <div><span class="outcome-label">DOWN</span><small>同规则独立统计</small></div>
+          <dl>
+            <div><dt>评估 / 有效</dt><dd><span id="down-evaluations">0</span> / <span id="down-qualified">0</span></dd></div>
+            <div><dt>成交 / 未成交</dt><dd><span id="down-fills">0</span> / <span id="down-no-fills">0</span></dd></div>
+            <div><dt>胜负 / 胜率</dt><dd><span id="down-win-loss">0–0</span> / <span id="down-win-rate">0.0%</span></dd></div>
+            <div><dt>净收益</dt><dd id="down-pnl">+$0.00</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel gate-panel" aria-labelledby="gate-heading">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-label gate-label">GATE · WebSocket 实时对照</p>
+            <h2 id="gate-heading">BTC 5分钟纸上交易</h2>
+          </div>
+          <span id="gate-status" class="quiet-badge">等待 Gate 数据</span>
+        </div>
+        <p class="gate-note">独立于 Polymarket 统计；按观察到的卖一价做1份粗粒度纸上入场，不代表真实成交，收益暂未扣除已核实手续费。</p>
+        <h3 class="gate-subsection-title">Gate 当前市场价格 <span>WebSocket 实时 · 数据每10秒聚合落盘</span></h3>
+        <div class="gate-overview">
+          <div class="gate-market-card">
+            <div class="gate-market-head">
+              <span id="gate-market-id">尚无当前市场</span>
+              <strong id="gate-countdown">--:--</strong>
+            </div>
+            <div class="gate-prices">
+              <div data-outcome="UP"><span>看涨 · UP 当前卖一</span><strong id="gate-up-ask">--</strong></div>
+              <div data-outcome="DOWN"><span>看跌 · DOWN 当前卖一</span><strong id="gate-down-ask">--</strong></div>
+            </div>
+          </div>
+          <dl class="gate-stats">
+            <div><dt>纸上信号</dt><dd id="gate-signal-count">0</dd></div>
+            <div><dt>未结持仓</dt><dd id="gate-open-count">0</dd></div>
+            <div><dt>已结算</dt><dd id="gate-closed-count">0</dd></div>
+            <div><dt>胜负 / 胜率</dt><dd><span id="gate-win-loss">0–0</span> / <span id="gate-win-rate">0.0%</span></dd></div>
+            <div><dt>毛收益/份</dt><dd id="gate-pnl">+$0.00</dd></div>
+          </dl>
+        </div>
+        <h3 class="gate-subsection-title gate-trade-title">Gate 实时成交 <span>页面保留最近20笔；落盘仅存10秒摘要</span></h3>
+        <div class="gate-trade-grid" aria-label="Gate 最近10秒主动成交统计">
+          <article data-outcome="UP"><strong>主动买涨 · UP</strong><span><b id="gate-up-trades">0</b> 笔</span><span>数量 <b id="gate-up-volume">0</b></span><span>VWAP <b id="gate-up-vwap">--</b></span></article>
+          <article data-outcome="DOWN"><strong>主动买跌 · DOWN</strong><span><b id="gate-down-trades">0</b> 笔</span><span>数量 <b id="gate-down-volume">0</b></span><span>VWAP <b id="gate-down-vwap">--</b></span></article>
+        </div>
+        <div class="table-scroll gate-live-trades">
+          <table class="activity-table gate-trade-table">
+            <thead><tr><th>成交时间</th><th>主动方向</th><th>换算价格</th><th>数量</th><th>原始方向</th><th>口径</th></tr></thead>
+            <tbody id="gate-trade-table"><tr><td colspan="6">等待 Gate WebSocket 成交</td></tr></tbody>
+          </table>
+        </div>
+        <h3 class="gate-subsection-title gate-stat-title">Gate 纸上交易分方向统计 <span>买涨、买跌互不混合</span></h3>
+        <div class="gate-direction-grid" aria-label="Gate 买涨买跌分方向统计">
+          <article class="gate-direction-card" data-outcome="UP">
+            <div class="gate-direction-heading">
+              <strong>买涨 · UP</strong>
+              <small>独立统计</small>
+            </div>
+            <dl>
+              <div><dt>信号 / 未结</dt><dd><span id="gate-up-signals">0</span> / <span id="gate-up-open">0</span></dd></div>
+              <div><dt>胜负 / 胜率</dt><dd><span id="gate-up-win-loss">0–0</span> / <span id="gate-up-win-rate">0.0%</span></dd></div>
+              <div><dt>毛收益/份</dt><dd id="gate-up-pnl">+$0.00</dd></div>
+            </dl>
+          </article>
+          <article class="gate-direction-card" data-outcome="DOWN">
+            <div class="gate-direction-heading">
+              <strong>买跌 · DOWN</strong>
+              <small>独立统计</small>
+            </div>
+            <dl>
+              <div><dt>信号 / 未结</dt><dd><span id="gate-down-signals">0</span> / <span id="gate-down-open">0</span></dd></div>
+              <div><dt>胜负 / 胜率</dt><dd><span id="gate-down-win-loss">0–0</span> / <span id="gate-down-win-rate">0.0%</span></dd></div>
+              <div><dt>毛收益/份</dt><dd id="gate-down-pnl">+$0.00</dd></div>
+            </dl>
+          </article>
+        </div>
+        <h3 class="gate-subsection-title gate-ledger-title">Gate 纸上入场与结算明细</h3>
+        <div class="table-scroll">
+          <table class="activity-table gate-table">
+            <thead><tr><th>时间</th><th>市场</th><th>方向</th><th>事件</th><th>剩余</th><th>价格 / 结果</th><th>毛收益/份</th></tr></thead>
+            <tbody id="gate-paper-table"><tr><td colspan="7">尚无 Gate 纸上交易</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel orderbook-panel">
+          <div class="panel-heading compact">
+            <div><p class="section-label">实时深度</p><h2>DOWN 十档盘口</h2></div>
+            <span id="book-health" class="quiet-badge">等待盘口</span>
+          </div>
+          <div class="book-columns">
+            <div>
+              <h3>卖盘 ASK</h3>
+              <table><thead><tr><th>价格</th><th>数量</th></tr></thead><tbody id="down-asks"><tr><td colspan="2">暂无数据</td></tr></tbody></table>
+            </div>
+            <div>
+              <h3>买盘 BID</h3>
+              <table><thead><tr><th>价格</th><th>数量</th></tr></thead><tbody id="down-bids"><tr><td colspan="2">暂无数据</td></tr></tbody></table>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel archive-panel">
+          <div class="panel-heading compact">
+            <div><p class="section-label">数据完整性</p><h2>采集与账本</h2></div>
+          </div>
+          <dl class="archive-list">
+            <div><dt>标准事件</dt><dd id="event-count">0</dd></div>
+            <div><dt>实时消息</dt><dd id="received-count">0</dd></div>
+            <div><dt>信号评估</dt><dd id="evaluation-count">0</dd></div>
+            <div><dt>纸上成交</dt><dd id="fill-count">0</dd></div>
+            <div><dt>连接错误</dt><dd id="error-count">0</dd></div>
+          </dl>
+          <div class="archive-path">
+            <span>本地归档目录</span>
+            <code id="data-dir">data/live_monitor</code>
+          </div>
+          <p class="archive-note">原始 WebSocket、标准事件、信号评估、纸上账本按 UTC 日期和小时分区保存，可用于回放与重新回测。</p>
+        </article>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-heading compact">
+          <div><p class="section-label">审计轨迹</p><h2>最近信号评估</h2></div>
+          <span class="quiet-badge">自动刷新 1秒</span>
+        </div>
+        <div class="table-scroll">
+          <table class="activity-table">
+            <thead><tr><th>时间</th><th>方向</th><th>剩余</th><th>价格</th><th>数量</th><th>结果</th><th>原因</th></tr></thead>
+            <tbody id="signal-table"><tr><td colspan="7">等待 UP / DOWN 成交事件</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-heading compact">
+          <div><p class="section-label">纸上账本</p><h2>成交与结算</h2></div>
+          <span id="open-position-badge" class="quiet-badge">0 个持仓</span>
+        </div>
+        <div class="table-scroll">
+          <table class="activity-table">
+            <thead><tr><th>时间</th><th>市场</th><th>方向</th><th>事件</th><th>数量</th><th>价格 / 结果</th><th>净收益</th></tr></thead>
+            <tbody id="paper-table"><tr><td colspan="7">尚无纸上交易</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      </div>
+      <section id="panel-candidates" class="monitor-pane" role="tabpanel" aria-labelledby="tab-candidates" hidden>
+        <article class="panel candidate-intro">
+          <div class="panel-heading">
+            <div><p class="section-label">新增数据 · 独立虚拟账户</p><h2 id="candidate-heading">六个候选，同时观察 UP / DOWN</h2></div>
+            <span class="mode-badge">仅纸上交易</span>
+          </div>
+          <p>共享行情，每个策略独立记账；UP / DOWN 在各自账户内共用资金与倍投进度。这里仅统计启用后的新交易，重叠收益不能直接相加。悬浮或点击策略标题可查看详细开仓逻辑。</p>
+          <p id="candidate-market">等待市场和Binance行情…</p>
+          <p id="candidate-health" role="status">正在读取候选账户</p>
+          <p id="candidate-coverage">尚无覆盖统计</p>
+          <div id="candidate-error" class="error-banner" role="alert" hidden></div>
+        </article>
+        <div class="candidate-toolbar">
+          <fieldset><legend id="candidate-ledgers">查看账本（十二本账户同时运行）</legend>
+            <label><input type="radio" name="candidate-sizing" value="fixed" checked> 固定1U</label>
+            <label><input type="radio" name="candidate-sizing" value="martin11"> 虚拟11级倍投</label>
+          </fieldset>
+          <p id="candidate-capital">固定账户各100U虚拟本金</p>
+        </div>
+        <div id="candidate-cards" class="candidate-grid"><article class="panel">等待候选策略状态</article></div>
+        <div id="candidate-strategy-help" class="candidate-strategy-help" role="tooltip" hidden></div>
+        <article class="panel">
+          <h2>每周实际模拟成交次数</h2>
+          <p class="candidate-note">北京时间，周一开始；未成交不计入次数。没有采集的时段不代表没有交易机会。</p>
+          <div class="table-scroll"><table class="candidate-table"><thead><tr id="candidate-week-head"><th>周一日期</th><th>翻转·保守</th><th>翻转·常规</th><th>D1</th><th>S3</th><th>A5</th><th>A6</th></tr></thead><tbody id="candidate-weeks"><tr><td colspan="7">尚无模拟成交</td></tr></tbody></table></div>
+        </article>
+        <article class="panel">
+          <h2>最近模拟订单与官方结算</h2>
+          <div class="table-scroll"><table class="candidate-table"><thead><tr><th>北京时间</th><th>策略</th><th>事件</th><th>市场 / 方向</th><th>预算 / 均价</th><th>净收益 / 原因</th></tr></thead><tbody id="candidate-events"><tr><td colspan="6">尚无候选订单</td></tr></tbody></table></div>
+        </article>
+        <details class="panel candidate-rules"><summary>查看冻结规则、模拟成交口径与数据说明</summary>
+          <p>共同条件：剩余270–30秒，决策卖一0.30–0.50；来源时间与本地接收时间均不超过2秒，收到完整盘口后才参与模拟。每秒判断一次，提交后至少等待300ms，再按当时盘口检查完整预算深度。执行超时或深度不足不使用以后更好的盘口补单。</p>
+          <p>翻转两版：使用已收盘1分钟Supertrend ATR10×3的真实方向翻转；收盘后至少1秒才能使用，信号在原收盘边界后60秒过期。保守版每份含费成本≤0.50，常规版每份价格≤0.50。</p>
+          <p>D1：|当前Binance Spot − 本场精确Binance开盘价| ÷ [ATR14 × √(剩余秒数÷60)] ≥1；按价格所在开盘价的一侧选择UP / DOWN。S3再要求1分钟Supertrend ATR14×3的已确认方向一致。Binance开盘价是研究锚点，胜负始终以Polymarket官方结算为准。</p>
+          <p>A5 / A6：z＝ln(当前Spot÷本场精确Binance开盘价) ÷ (1分钟ATR14÷当前Spot)。A5在z≥1.0买UP、z≤−1.0买DOWN；A6阈值为±1.5。不做剩余时间缩放，不要求Supertrend方向；Spot来源与接收时间均≤2秒。新增账户从各自启用时间开始统计，原四个账户延续旧记录。</p>
+          <p>固定1U包含模拟费用；11级倍投预算为1、2、4…1024U，赢一笔或第11次亏损后回到1U。每档重新检查深度，余额不足停止新单。上一笔官方结果收到后，且市场结束至少60秒，才允许下一笔。单账户同一时刻最多一笔订单或持仓。</p>
+          <p>为延续历史报告，本页冻结模拟费率系数0.07：每份费用=0.07×价格×(1−价格)。这是研究估算，不是当前平台收费承诺。份额向下取整到0.01，允许预算最多剩余0.01U；纸上成交不代表真实成交。</p>
+          <p>回撤按已结算净值计算。未结算持仓、待执行订单、断档与调度漏秒单列，不把未结算算输赢。规则变更须建立新版本，旧账本保留。共享观察快照、独立订单及账户日志保存在data/live_monitor/candidates/v1/。</p>
+          <p id="candidate-version"></p>
+        </details>
+      </section>
+      <div id="error-banner" class="error-banner" role="alert" hidden></div>
+    </main>
+  </body>
+</html>

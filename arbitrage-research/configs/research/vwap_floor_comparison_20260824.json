@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "trade_down_vwap_0_85_only_90_30_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "DOWN",
+      "price_min": "0.00",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10",
+      "entry_vwap_min": null
+    },
+    {
+      "case_id": "trade_down_vwap_0_80_0_85_90_30_q10_size10",
+      "trigger": "buy_trade",
+      "outcome": "DOWN",
+      "price_min": "0.00",
+      "price_max": "0.85",
+      "execution_price_cap": "0.85",
+      "entry_vwap_min": "0.80",
+      "max_remaining_seconds": 90,
+      "min_remaining_seconds": 30,
+      "quantity": "10",
+      "min_trade_size": "10"
+    }
+  ]
+}

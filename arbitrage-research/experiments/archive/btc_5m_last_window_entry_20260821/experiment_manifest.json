@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "research_id": "btc_5m_last_window_entry_20260821",
+  "report_version": "1.4.0",
+  "archived_at": "2026-08-21T00:00:00+08:00",
+  "status": "completed_research_only",
+  "production_strategy_change": false,
+  "production_recommendation": "do_not_enable_any_candidate_automatically",
+  "baseline_strategy": {
+    "path": "configs/strategies/last_2m_threshold.json",
+    "sha256": "70a107f4a648ac452e1cac67f54694fd45659e6414bf915dfc44303d5ca0d72d"
+  },
+  "data_sources": [
+    {
+      "path": "data/markets/btc_5m_official_trades_combined.ndjson",
+      "market_count": 351,
+      "event_count": 608372,
+      "price_source": "observed_taker_buy_trade",
+      "sha256": "1a97a075d4c4207292d0f09e0c10cec769786c63e6e175a55246fd5659c52864"
+    },
+    {
+      "path": "data/markets/btc_5m_complete_official_settlement.ndjson",
+      "market_count": 47,
+      "price_source": "continuous_best_ask",
+      "sha256": "79aa40106b3e2f0e2f7156c4b97d2a027aee4aaf9803db9bb3adfbb27118ea68"
+    }
+  ],
+  "result_files": [
+    {
+      "path": "runs/candidate_stress_75_80_80_85.csv",
+      "sha256": "eae6bedabcca6f4c85cbfba254fe60dd325326b2267d3aac300d1e5275d743ba"
+    },
+    {
+      "path": "runs/candidate_stress_chrono_70_30.csv",
+      "sha256": "f9477c1c87d101f657304dc15b629ce7def1f2738a293471f5a146250e557cd1"
+    },
+    {
+      "path": "runs/candidate_stress_chrono_7blocks.csv",
+      "sha256": "af49f01af287644eec3c9bd75a947cd80ca30e0d92b3ab24824b7f4bb3385821"
+    },
+    {
+      "path": "runs/candidate_stress_same47.csv",
+      "sha256": "11bc967189242d57171b60fb6c1217b6f1d44bcdf60cc981228eaf90a149b245"
+    },
+    {
+      "path": "runs/l4_depth_stress_coverage_gated.csv",
+      "sha256": "11058d1b00e5315599b0b7d78f4010269ab60517d1fead99de6d174c8672602c",
+      "usable_for_capacity_conclusions": false,
+      "reason": "no market passed target-window order-book coverage gate"
+    },
+    {
+      "path": "runs/practical_candidates_90_30.csv",
+      "sha256": "ab0a0cc1316dc95d1e1b4f6ba337f5fca95446f4d6b127a25f7fe755515625ad",
+      "excludes_terminal_30_seconds": true
+    },
+    {
+      "path": "runs/down_80_85_size10_90_30_failure_analysis.json",
+      "sha256": "815316e1f16c72ec694302a03194ea39e7849b3e5b55698bc0937d7163c8293c"
+    },
+    {
+      "path": "runs/up_80_85_size10_90_30_failure_analysis.json",
+      "sha256": "eaa8e759a2c562c34d3dc6a420f9c64e95205e820d7d3bed3c1d3bb1e8eca884"
+    },
+    {
+      "path": "runs/btc_5m_official_trades_80_85_remaining_120_0_fee/last_window_report.json",
+      "sha256": "4558167fa9b033c338ac8a99f2f778fb349d40f092440dd3158b48c2c4c3953f"
+    },
+    {
+      "path": "runs/btc_5m_official_trades_80_85_remaining_120_0_fee/last_window_results.csv",
+      "sha256": "674ff212693ebfd2df556c7fddc600e61fc4cd3702b12c7d221aca6ccf4b8daa"
+    },
+    {
+      "path": "runs/practical_candidates_120_0.csv",
+      "sha256": "279f950f10f790e060f71397c3bc15ff4ffb6e77cefddd0edb067612242ad75b"
+    },
+    {
+      "path": "runs/btc_5m_official_trades_80_85_remaining_100_0_fee/last_window_report.json",
+      "sha256": "f3781511f347e526ccc21c5e8a25c5744b641a6674f74dcf0c38ffca6bdf47eb"
+    },
+    {
+      "path": "runs/btc_5m_official_trades_80_85_remaining_100_0_fee/last_window_results.csv",
+      "sha256": "7dc14bd6c05c94b2a89ed2cd947b294a8872f71e393159b4a98cf78a802cf45a"
+    },
+    {
+      "path": "runs/practical_candidates_100_0.csv",
+      "sha256": "4a016f775b8490aee5f32d48ac8220acb6e3a23d5610debfdca1dca78ebff15f"
+    }
+  ],
+  "reproduction": {
+    "candidate_runner": "scripts/analysis/run_candidate_stress_test.py",
+    "failure_analyzer": "scripts/analysis/analyze_candidate_failures.py",
+    "failure_analyzer_sha256": "bbd975493b21cb431543d1683b1351eb50aa459f5d2fd33381acefd5f7de158e",
+    "depth_runner": "scripts/analysis/run_l4_depth_stress_test.py",
+    "fee_model": "polymarket_crypto_taker",
+    "fee_rate": "0.07",
+    "unit_tests_passed": 13
+  },
+  "external_orderbook_api_status": "http_403_at_research_time",
+  "secrets_stored": false
+}
