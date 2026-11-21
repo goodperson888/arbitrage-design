@@ -18,6 +18,8 @@ GitHub 的绿色 **Code → Download ZIP** 下载的是源码，不包含便携�
 
 如果需要在 Windows 开发环境运行离线分析，请单独创建 Python 虚拟环境，安装 `tools/windows/requirements-test.txt` 和相应项目；不要向便携包的 `runtime` 安装分析或开发依赖。
 
+客户便携包按 `tools/windows/distribution.py` 中的发布清单生成：只复制三个项目的程序源码与页面资源、明确列出的采集入口、配置及 Windows 启动工具。开发设计文档、研究报告、离线分析脚本、测试和构建工具不随包发布。客户只看到独立编写的 `使用说明.md`；`application-manifest.json` 记录发布的项目文件清单。第三方运行依赖的许可证与必要资源继续保留。开发仓库中的原文档不删除，公开仓库的可见范围也不因精简客户包而改变。
+
 ## 第一次启动
 
 根目录只保留两个操作入口：
@@ -123,4 +125,4 @@ Mac 开发并 `git push` 后由 Actions 自动打包。也可在已安装 Python
 python tools\windows\build.py --output dist\manual-build
 ```
 
-输出目录必须不存在，构建器不会清理或覆盖已有目录。构建只读取 Git 跟踪的文件；下载官方 Python/Node 运行时后验证固定 SHA-256，依赖只安装 Windows 二进制 wheel。最终包仍通过独立的 `tools/windows/smoke_test.py` 验证。
+输出目录必须不存在，构建器不会清理或覆盖已有目录。构建只从 Git 跟踪的文件中选择发布清单允许的文件，缺少必需文件会中止；下载官方 Python/Node 运行时后验证固定 SHA-256，依赖只安装 Windows 二进制 wheel。最终包仍通过独立的 `tools/windows/smoke_test.py` 验证，并检查没有混入项目设计文档、研究报告或离线分析脚本。

@@ -14,6 +14,13 @@ import urllib.request
 
 
 def smoke(root: Path) -> None:
+    first_party = [path.relative_to(root) for path in root.rglob("*")
+                   if path.is_file() and not path.relative_to(root).parts[0] == "runtime"]
+    assert [path.as_posix() for path in first_party if path.suffix == ".md"] == ["使用说明.md"]
+    assert not any({"docs", "design-system", "analysis", "tests", ".github"}.intersection(path.parts)
+                   for path in first_party), "Development files leaked into customer package"
+    manifest = json.loads((root / "application-manifest.json").read_text(encoding="utf-8"))
+    assert all((root / name).is_file() for name in manifest["files"])
     python = root / "runtime/python.exe"
     manager = root / "tools/windows/manager.py"
     subprocess.run([str(python), str(root / "tools/windows/verify_runtime.py")],

@@ -14,6 +14,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from package_layout import copy_runtime_packages
+from distribution import copy_application
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SPEC = json.loads((ROOT / "tools/windows/runtime-spec.json").read_text(encoding="utf-8"))
@@ -49,21 +50,9 @@ def build(destination: Path) -> Path:
     app = destination / "ArbitrageDesign"
     app.mkdir()
     files = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
-    forbidden = {"data", "runs", "node_modules", ".venv", "__pycache__", ".git", "logs", ".license-private"}
-    for name in filter(None, files):
-        relative = PurePosixPath(name)
-        if any(part in forbidden for part in relative.parts):
-            raise ValueError(f"Unexpected private/generated file in Git index: {name}")
-        if (relative.name.startswith(".env") and relative.name != ".env.example") or relative.suffix in {".pem", ".key", ".pfx", ".p12"}:
-            raise ValueError(f"Unexpected credential file: {name}")
-        if relative.parts[0] == ".github" or relative.name == ".gitignore" or "tests" in relative.parts:
-            continue
-        source = ROOT / name
-        if source.is_symlink():
-            raise ValueError(f"Refusing source symlink: {name}")
-        target = app / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+    manifest = copy_application(ROOT, app, files)
+    (app / "application-manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     runtime = app / "runtime"
     runtime.mkdir()
     with tempfile.TemporaryDirectory(prefix="arb-build-") as scratch:
