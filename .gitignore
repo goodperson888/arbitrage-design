@@ -70,5 +70,8 @@ artifacts_work/
 *.zip
 *.tar.gz
 runtime/
+.runtime-setup-*/
+.runtime-setup.lock
+runtime-previous-*/
 dependency-lock.json
 build-info.json

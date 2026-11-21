@@ -19,16 +19,14 @@ Git 保存源代码、参数模板、测试和研究文档；`data/`、`runs/`�
 
 ## Windows 与打包状态
 
-每次推送 `main`，GitHub Actions 的 **Windows portable package** 自动在 Windows 上测试并构建带 Python、Node 和运行依赖的便携 ZIP。请在 Actions 最近成功运行的 **Artifacts** 中下载 **ArbitrageDesign-Windows-x64**，解压程序包后按顺序运行：
+每次推送 `main`，GitHub Actions 的 **Windows portable package** 自动在 Windows 上测试并构建带 Python、Node 和运行依赖的便携 ZIP。请在 Actions 最近成功运行的 **Artifacts** 中下载 **ArbitrageDesign-Windows-x64**，解压程序包后只需两个入口：
 
-1. `01-Configure.cmd`：配置外部数据目录和 Windows 本机代理。
-2. `07-Check-Installation.cmd`：检查安装。
-3. `02-Start-Collectors.cmd`：开启纸上监控、5/15分钟采集和 Gate。
-4. `03-Status.cmd` 查看状态，`04-Stop-All.cmd` 正常关闭全部。
+1. `开启.cmd`：自动检查环境，首次提示数据目录和代理端口（默认 `7890`，输入 `0` 直连），保存后开启纸上监控、5/15分钟采集和 Gate，并打开页面。后续直接复用设置。
+2. `停止.cmd`：正常关闭全部服务，保留数据。
 
-实时辅助网页、实盘管理页各有独立启动脚本。配置和数据放在程序目录之外，更新代码不覆盖账本。启动采集不会自动开启真实交易。
+完整包自带环境；缺失或损坏时自动从官方源下载、校验并安装到程序目录，无需管理员权限。实时辅助网页、实盘管理页和单独服务控制放在高级命令中。配置和数据放在程序目录之外，更新代码不覆盖账本。启动采集不会自动开启真实交易。
 
-完整下载、迁移、更新、密钥保存和单独控制步骤见 [Windows部署与数据迁移](docs/Windows部署与数据迁移.md)。GitHub 的 **Code → Download ZIP** 是源码，不含便携运行时；Mac 虚拟环境不能复制到 Windows 使用。
+完整下载、迁移、更新、密钥保存和单独控制步骤见 [Windows部署与数据迁移](docs/Windows部署与数据迁移.md)。GitHub 的 **Code → Download ZIP** 是源码，首次开启需要联网自动准备环境；完整便携包则无需这次下载。Mac 虚拟环境不能复制到 Windows 使用。
 
 ## 本地 Git 同步
 

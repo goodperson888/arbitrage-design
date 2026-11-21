@@ -9,11 +9,13 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import socket
 import subprocess
 import sys
 import time
 from uuid import uuid4
 import webbrowser
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 for project in ("arbitrage-research", "arbitrage-live", "arbitrage-realtime"):
@@ -42,11 +44,8 @@ def write_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def load_settings() -> dict:
-    path = settings_path()
-    if not path.exists():
-        raise ValueError("请先双击 01-Configure.cmd 设置数据目录和代理。")
-    config = json.loads(path.read_text(encoding="utf-8-sig"))
+def validate_settings(config: dict) -> dict:
+    config = dict(config)
     directory = Path(config["data_root"]).expanduser()
     if not directory.is_absolute() or directory == Path(directory.anchor):
         raise ValueError("数据目录必须是绝对路径，并且不能是磁盘根目录")
@@ -60,9 +59,38 @@ def load_settings() -> dict:
     directory.mkdir(parents=True, exist_ok=True)
     config["data_root"] = str(directory.resolve())
     proxy = str(config.get("proxy", ""))
-    if proxy and not proxy.startswith(("http://", "https://", "socks5://", "socks5h://")):
-        raise ValueError("代理必须是 http(s) 或 socks5 URL；不用代理请留空")
+    config["proxy"] = parse_proxy(proxy)
     return config
+
+
+def load_settings() -> dict:
+    path = settings_path()
+    if not path.exists():
+        raise ValueError("尚未配置，请双击 开启.cmd 完成首次设置。")
+    return validate_settings(json.loads(path.read_text(encoding="utf-8-sig")))
+
+
+def parse_proxy(value: str) -> str:
+    value = value.strip()
+    if value.lower() in {"", "0", "none", "direct"}:
+        return ""
+    if value.isascii() and value.isdigit():
+        value = f"http://127.0.0.1:{value}"
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https", "socks5", "socks5h"} or not parsed.hostname:
+        raise ValueError("请输入代理端口（1–65535），或完整 http(s)/socks5 地址；0 表示直连")
+    if parsed.port is None or not 1 <= parsed.port <= 65535 or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("代理需要有效端口（1–65535），且不能含路径、查询或片段")
+    return value
+
+
+def prompt_proxy(default: str = "http://127.0.0.1:7890") -> str:
+    display = default.removeprefix("http://127.0.0.1:") or "0"
+    while True:
+        try:
+            return parse_proxy(input(f"本机代理端口 [{display}]，0=不使用代理: ").strip() or default)
+        except ValueError as exc:
+            print(exc)
 
 
 def configure() -> None:
@@ -70,21 +98,35 @@ def configure() -> None:
     current = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
     default = current.get("data_root", str(path.parent / "data"))
     directory = input(f"数据目录 [{default}]: ").strip().strip('"') or default
-    proxy = input("代理 URL [http://127.0.0.1:7890]，输入 none 表示直连: ").strip()
-    proxy = "" if proxy.lower() == "none" else proxy or "http://127.0.0.1:7890"
+    # The downloader already asked when preparing a missing portable runtime.
+    setup_proxy = os.environ.get("ARB_SETUP_PROXY", "") if os.environ.get("ARB_SETUP_PROXY_SET") else None
+    proxy = parse_proxy(setup_proxy) if setup_proxy is not None else prompt_proxy(current.get("proxy", "http://127.0.0.1:7890"))
     if path.exists():
         old = load_settings()
         if any(is_running(Path(old["data_root"]), name) for name in SERVICES):
             raise ValueError("请先停止全部服务，再修改数据目录或代理")
-    # Validate before replacing the existing configuration.
-    candidate = Path(directory).expanduser()
-    if not candidate.is_absolute() or candidate == Path(candidate.anchor) or candidate.resolve().is_relative_to(ROOT):
-        raise ValueError("请填写程序目录以外的绝对数据路径")
-    if proxy and not proxy.startswith(("http://", "https://", "socks5://", "socks5h://")):
-        raise ValueError("代理 URL 格式无效")
-    write_json(path, {"data_root": str(candidate), "proxy": proxy})
-    config = load_settings()
+    config = validate_settings({"data_root": directory, "proxy": proxy})
+    write_json(path, config)
     print(f"配置已保存：{path}\n数据：{config['data_root']}\n代理：{proxy or '直连'}")
+
+
+def check_local_proxy(config: dict) -> dict:
+    """Check the configured listener, not access to any particular exchange."""
+    while config.get("proxy"):
+        parsed = urlsplit(config["proxy"])
+        if parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            break
+        try:
+            with socket.create_connection((parsed.hostname, parsed.port), timeout=2):
+                pass
+            break
+        except OSError:
+            print(f"本机代理端口 {parsed.port} 未连接。请先开启代理软件，或填写正确端口。")
+            if any(is_running(Path(config["data_root"]), name) for name in SERVICES):
+                raise ValueError("已有服务使用当前配置；请先双击 停止.cmd，再修改代理")
+            config = dict(config, proxy=prompt_proxy(config["proxy"]))
+            write_json(settings_path(), config)
+    return config
 
 
 def control_dir(directory: Path) -> Path:
@@ -276,7 +318,7 @@ def doctor(config: dict) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Arbitrage Design Windows 便携版管理器")
-    parser.add_argument("action", choices=("configure", "start", "stop", "status", "doctor", "open", "worker"))
+    parser.add_argument("action", choices=("launch", "configure", "start", "stop", "status", "doctor", "open", "worker"))
     parser.add_argument("service", nargs="?", choices=SERVICES + ("all",), default="all")
     parser.add_argument("--boot", default="")
     args = parser.parse_args()
@@ -284,7 +326,17 @@ def main() -> int:
         if args.action == "configure":
             configure()
             return 0
+        if args.action == "stop" and not settings_path().exists():
+            print("尚未配置启动，无需停止。")
+            return 0
+        if args.action == "launch" and not settings_path().exists():
+            configure()
         config = load_settings()
+        launching = args.action == "launch"
+        if launching:
+            config = check_local_proxy(config)
+            doctor(config)
+            args.action = "start"
         if args.action == "worker":
             return worker(config, args.service, args.boot)
         if args.action == "status":
@@ -307,8 +359,11 @@ def main() -> int:
                     results = [stop_one(directory, name) for name in names]
                     if not all(results):
                         return 1
+            if launching:
+                status(config)
+                webbrowser.open("http://127.0.0.1:8765/")
         return 0
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, RuntimeError, EOFError, KeyError) as exc:
         print(f"操作失败：{exc}", file=sys.stderr)
         return 1
 

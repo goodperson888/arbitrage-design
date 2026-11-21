@@ -13,10 +13,9 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PYTHON_URL = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
-PYTHON_SHA256 = "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
-NODE_URL = "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip"
-NODE_SHA256 = "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f"
+RUNTIME_SPEC = json.loads((ROOT / "tools/windows/runtime-spec.json").read_text(encoding="utf-8"))
+PYTHON_URL, PYTHON_SHA256 = (RUNTIME_SPEC["python"][key] for key in ("url", "sha256"))
+NODE_URL, NODE_SHA256 = (RUNTIME_SPEC["node"][key] for key in ("url", "sha256"))
 
 
 def download(url: str, target: Path, expected: str) -> None:
@@ -95,7 +94,7 @@ def build(destination: Path) -> Path:
         "node": "24.22.3", "pythonSha256": PYTHON_SHA256, "nodeSha256": NODE_SHA256,
         "platform": "windows-x64"}, indent=2), encoding="utf-8")
     # Batch files must work from Explorer and from paths with spaces/non-ASCII.
-    for path in app.glob("*.cmd"):
+    for path in app.rglob("*.cmd"):
         value = path.read_text(encoding="utf-8").replace("\r\n", "\n")
         path.write_bytes(value.replace("\n", "\r\n").encode("utf-8"))
     archive = destination / "ArbitrageDesign-Windows-x64.zip"

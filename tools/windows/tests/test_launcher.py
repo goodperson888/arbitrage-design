@@ -68,3 +68,87 @@ def test_data_file_prefix_and_traversal_are_not_bundle_entries(tmp_path):
     with pytest.raises(ValueError):
         builder.extract(archive, tmp_path / "runtime")
     assert not (tmp_path / "account.txt").exists()
+
+
+@pytest.mark.parametrize(("value", "expected"), [
+    ("7890", "http://127.0.0.1:7890"), ("10808", "http://127.0.0.1:10808"),
+    ("0", ""), ("none", ""), ("", ""), ("socks5://127.0.0.1:1080", "socks5://127.0.0.1:1080"),
+])
+def test_proxy_port_or_explicit_direct(value, expected):
+    assert manager.parse_proxy(value) == expected
+
+
+@pytest.mark.parametrize("value", ["65536", "-1", "abc", "http://localhost", "http://localhost:0",
+                                       "http://localhost:7890/api", "http://localhost:7890?q=1"])
+def test_invalid_proxy_never_saved(value):
+    with pytest.raises(ValueError):
+        manager.parse_proxy(value)
+
+
+def test_first_run_saves_external_data_and_port_once(tmp_path, monkeypatch):
+    config = tmp_path / "launcher.json"
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(config))
+    monkeypatch.delenv("ARB_SETUP_PROXY_SET", raising=False)
+    answers = iter([str(tmp_path / "数据"), "wrong", "10808"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    manager.configure()
+    saved = manager.load_settings()
+    assert saved["proxy"] == "http://127.0.0.1:10808"
+    assert Path(saved["data_root"]) == tmp_path / "数据"
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("saved configuration must not prompt"))
+    assert manager.load_settings() == saved
+
+
+def test_setup_direct_choice_is_reused_without_second_proxy_prompt(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(tmp_path / "launcher.json"))
+    monkeypatch.setenv("ARB_SETUP_PROXY_SET", "1")
+    monkeypatch.delenv("ARB_SETUP_PROXY", raising=False)
+    prompts = []
+    monkeypatch.setattr("builtins.input", lambda question: prompts.append(question) or "")
+    manager.configure()
+    assert len(prompts) == 1
+    assert manager.load_settings()["proxy"] == ""
+
+
+def test_closed_proxy_can_be_corrected_and_persisted(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(tmp_path / "launcher.json"))
+    config = {"data_root": str(tmp_path / "data"), "proxy": "http://127.0.0.1:7890"}
+    def refused(*args, **kwargs):
+        raise ConnectionRefusedError()
+    monkeypatch.setattr(manager.socket, "create_connection", refused)
+    monkeypatch.setattr("builtins.input", lambda _: "0")
+    assert manager.check_local_proxy(config)["proxy"] == ""
+    assert manager.load_settings()["proxy"] == ""
+
+
+def test_proxy_change_never_mixes_settings_with_running_worker(tmp_path, monkeypatch):
+    config = {"data_root": str(tmp_path), "proxy": "http://127.0.0.1:7890"}
+    def refused(*args, **kwargs):
+        raise ConnectionRefusedError()
+    monkeypatch.setattr(manager.socket, "create_connection", refused)
+    monkeypatch.setattr(manager, "is_running", lambda *_: True)
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("cannot reconfigure active services"))
+    with pytest.raises(ValueError, match="停止"):
+        manager.check_local_proxy(config)
+
+
+def test_invalid_reconfiguration_preserves_previous_file(tmp_path, monkeypatch):
+    config = tmp_path / "launcher.json"
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(config))
+    monkeypatch.delenv("ARB_SETUP_PROXY_SET", raising=False)
+    manager.write_json(config, {"data_root": str(tmp_path / "data"), "proxy": ""})
+    before = config.read_bytes()
+    answers = iter(["relative", "0"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    with pytest.raises(ValueError):
+        manager.configure()
+    assert config.read_bytes() == before
+
+
+def test_stop_before_first_run_does_not_prompt_or_create_settings(tmp_path, monkeypatch):
+    path = tmp_path / "launcher.json"
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(path))
+    monkeypatch.setattr(sys, "argv", ["manager", "stop", "all"])
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("stop must never configure"))
+    assert manager.main() == 0
+    assert not path.exists()
