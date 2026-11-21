@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import asyncio
 import inspect
 import json
 import os
+import socket
 import threading
 import time
 from http import HTTPStatus
@@ -18,6 +20,15 @@ from .history import LightweightFactRecorder
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = ROOT / "web"
+
+
+class LocalHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 class RuntimeState:
@@ -260,9 +271,17 @@ class _Handler(BaseHTTPRequestHandler):
 def run_server(host: str = "127.0.0.1", port: int = 8787, symbol: str = "BTCUSDT", interval_seconds: int = 300, proxy: str | None = None, history_path: str | None = None, history_interval_seconds: float = 10.0, stop_file: Path | None = None) -> None:
     state = RuntimeState(symbol, interval_seconds, history_path, history_interval_seconds)
     worker = BinanceWorker(state, proxy=proxy)
-    worker.start()
-    server = ThreadingHTTPServer((host, port), _Handler)
+    try:
+        server = LocalHTTPServer((host, port), _Handler)
+    except OSError as exc:
+        if exc.errno != errno.EADDRINUSE and getattr(exc, "winerror", None) not in {10048, 10013}:
+            raise
+        server = LocalHTTPServer((host, 0), _Handler)
+    port = server.server_address[1]
     server.runtime_state = state  # type: ignore[attr-defined]
+    if os.environ.get("ARB_WEB_READY_FILE"):
+        Path(os.environ["ARB_WEB_READY_FILE"]).write_text(str(port), encoding="ascii")
+    worker.start()
     closing = threading.Event()
 
     def watch_stop():

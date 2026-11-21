@@ -146,6 +146,19 @@ def is_running(directory: Path, name: str) -> bool:
     return False
 
 
+def service_url(directory: Path, name: str) -> str:
+    if name not in PORTS:
+        raise ValueError("该服务没有网页，请选择 paper、live 或 realtime")
+    try:
+        state = json.loads((control_dir(directory) / f"{name}.json").read_text(encoding="utf-8"))
+        port = int(state.get("port", PORTS[name]))
+        if not 1 <= port <= 65535:
+            raise ValueError("网页端口无效")
+    except (OSError, ValueError, TypeError):
+        port = PORTS[name]
+    return f"http://127.0.0.1:{port}/"
+
+
 @contextmanager
 def windows_process_witness(pid: int, expected_birth: int | None = None):
     """Wait on a verified process handle, never a possibly reused PID."""
@@ -220,14 +233,14 @@ def command_for(name: str, directory: Path, proxy: str, stop: Path) -> tuple[lis
             command += ["--websocket-url", os.environ["ARB_GATE_WS_URL"]]
         return command, research
     if name == "realtime":
-        command = ["-m", "realtime_probability.web", "--history-path", str(directory / "realtime/facts.ndjson"), *common]
+        command = ["-m", "realtime_probability.web", "--port", str(PORTS[name]), "--history-path", str(directory / "realtime/facts.ndjson"), *common]
         if proxy:
             command += ["--proxy", proxy]
         return command, ROOT / "arbitrage-realtime"
     if name == "live":
         # Starts the management UI only. Trading still requires the existing
         # explicit UI action, credentials and complete preflight.
-        return ["-m", "live_trader.cli", "dashboard", "--data-dir", str(directory / "live_trading"), *common], ROOT / "arbitrage-live"
+        return ["-m", "live_trader.cli", "dashboard", "--port", str(PORTS[name]), "--data-dir", str(directory / "live_trading"), *common], ROOT / "arbitrage-live"
     raise ValueError(f"未知服务：{name}")
 
 
@@ -248,18 +261,16 @@ def start_one(config: dict, name: str) -> None:
         return
     # Check prerequisites before starting a detached worker.
     command_for(name, directory, config.get("proxy", ""), control_dir(directory) / f"{name}.stop")
-    if name in PORTS:
-        import socket
-        with socket.socket() as sock:
-            if sock.connect_ex(("127.0.0.1", PORTS[name])) == 0:
-                raise ValueError(f"端口 {PORTS[name]} 已被其他进程占用；未启动 {name}")
     stop = control_dir(directory) / f"{name}.stop"
     stop.unlink(missing_ok=True)
     boot = uuid4().hex
+    ready = control_dir(directory) / f"{name}-{boot}.port"
     logs = directory / "launcher_logs"
     logs.mkdir(parents=True, exist_ok=True)
     log = logs / f"{name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{boot[:8]}.log"
     env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
+    if name in PORTS:
+        env["ARB_WEB_READY_FILE"] = str(ready)
     flags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
     with log.open("ab") as target:
         process = subprocess.Popen([sys.executable, "-X", "utf8", "-u", str(Path(__file__).resolve()),
@@ -278,17 +289,27 @@ def start_one(config: dict, name: str) -> None:
                 break
             import urllib.request
             try:
+                port = int(ready.read_text(encoding="ascii"))
+                if not 1 <= port <= 65535:
+                    raise ValueError("服务返回的端口无效")
                 with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(
-                        f"http://127.0.0.1:{PORTS[name]}/", timeout=0.5) as response:
+                        f"http://127.0.0.1:{port}/", timeout=0.5) as response:
                     if response.status == 200:
+                        state_path = control_dir(directory) / f"{name}.json"
+                        state = json.loads(state_path.read_text(encoding="utf-8"))
+                        if state.get("boot") != boot:
+                            raise RuntimeError("服务启动标识发生变化")
+                        write_json(state_path, dict(state, port=port))
                         break
-            except OSError:
+            except (OSError, ValueError):
                 pass
         time.sleep(0.1)
     else:
         stop.touch()
         raise RuntimeError(f"{name} 启动未通过检查，已请求正常停止；日志：{log}")
     print(f"{name} 已启动；日志：{log}")
+    if name in PORTS:
+        print(f"页面：{service_url(directory, name)}（默认端口被占用时自动换用空闲端口）")
 
 
 def stop_one(directory: Path, name: str, timeout: float = 60) -> bool:
@@ -310,6 +331,9 @@ def stop_one(directory: Path, name: str, timeout: float = 60) -> bool:
 def worker(config: dict, name: str, boot: str) -> int:
     directory = Path(config["data_root"])
     control = control_dir(directory)
+    ready = control / f"{name}-{boot}.port"
+    if name in PORTS:
+        os.environ["ARB_WEB_READY_FILE"] = str(ready)
     command, cwd = command_for(name, directory, config.get("proxy", ""), control / f"{name}.stop")
     with exclusive_lock(control / f"{name}.lock"):
         state = {"service": name, "pid": os.getpid(), "boot": boot,
@@ -332,8 +356,15 @@ def worker(config: dict, name: str, boot: str) -> int:
             return 0
         finally:
             os.chdir(previous)
+            if name in PORTS:
+                try:
+                    state["port"] = int(ready.read_text(encoding="ascii"))
+                except (OSError, ValueError):
+                    pass
             state.update(status="stopped", stoppedAt=datetime.now(timezone.utc).isoformat())
             write_json(control / f"{name}.json", state)
+            if name in PORTS:
+                ready.unlink(missing_ok=True)
 
 
 def status(config: dict) -> None:
@@ -341,7 +372,7 @@ def status(config: dict) -> None:
     print(f"数据目录：{directory}\n代理：{config.get('proxy') or '直连'}")
     for name in SERVICES:
         running = is_running(directory, name)
-        url = f" http://127.0.0.1:{PORTS[name]}/" if name in PORTS else ""
+        url = f" {service_url(directory, name)}" if name in PORTS else ""
         print(f"{name:8} {'运行中' if running else '已停止'}{url if running else ''}")
     for name, folder in (("paper", "live_monitor"), ("cross", "cross_market_validation"), ("cross15", "cross_market_validation_15m")):
         path = directory / folder / "state/latest.json"
@@ -394,7 +425,7 @@ def main() -> int:
         elif args.action == "doctor":
             doctor(config)
         elif args.action == "open":
-            webbrowser.open(f"http://127.0.0.1:{PORTS.get(args.service, 8765)}/")
+            webbrowser.open(service_url(Path(config["data_root"]), "paper" if args.service == "all" else args.service))
         else:
             directory = Path(config["data_root"])
             names = (COLLECTORS if args.action == "start" else SERVICES) if args.service == "all" else (args.service,)
@@ -411,7 +442,7 @@ def main() -> int:
                         return 1
             if launching:
                 status(config)
-                webbrowser.open("http://127.0.0.1:8765/")
+                webbrowser.open(service_url(directory, "paper"))
         return 0
     except (OSError, ValueError, RuntimeError, EOFError, KeyError) as exc:
         print(f"操作失败：{exc}", file=sys.stderr)

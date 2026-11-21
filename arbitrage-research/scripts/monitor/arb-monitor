@@ -165,6 +165,8 @@ for name, path in paths.items():
         if stamp and status in {"running", "live"} and (now - float(stamp)) > 120_000_000:
             status = "stale"
         print(f"{name:5} status={status}  更新={age}  error={service.get('lastError') or '-'}")
+        if service.get("dashboardUrl"):
+            print(f"      页面：{service['dashboardUrl']}")
     except FileNotFoundError:
         print(f"{name:5} 状态文件不存在")
     except Exception as exc:

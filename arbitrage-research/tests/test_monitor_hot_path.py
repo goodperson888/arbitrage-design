@@ -109,7 +109,7 @@ def test_buffered_binance_trade_burst_yields_to_other_tasks(tmp_path, monkeypatc
     async def run():
         f = feed_module.BinanceFeed(tmp_path, None)
         monkeypatch.setattr(f, "bootstrap", bootstrap)
-        monkeypatch.setattr(feed_module, "time", SimpleNamespace(monotonic=monotonic))
+        monkeypatch.setattr(feed_module, "time", SimpleNamespace(monotonic=monotonic, time_ns=lambda: 1_800_000_000_000_000_000))
         monkeypatch.setattr(feed_module, "clock_us", lambda: 1_800_000_000_000_000)
         monkeypatch.setattr(feed_module.websockets, "connect", lambda *args, **kwargs: BufferedSocket())
 

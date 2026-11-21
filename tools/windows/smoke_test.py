@@ -40,23 +40,46 @@ def smoke(root: Path) -> None:
             subprocess.run(f'"{root / name}"', shell=True, input=answers, encoding="utf-8",
                            env=env, cwd=root, check=True, timeout=150)
         services = ("paper", "cross", "cross15", "gate", "realtime", "live")
+        class UnrelatedService(BaseHTTPRequestHandler):
+            requests = 0
+            def do_GET(self):
+                type(self).requests += 1
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Unrelated service must not be opened")
+            def log_message(self, *args):
+                pass
+        occupied = []
         try:
+            # Exercise the real Windows binding path with ALL preferred web
+            # ports already held by unrelated processes/services.
+            for port in (8765, 8766, 8787):
+                server = ThreadingHTTPServer(("127.0.0.1", port), UnrelatedService)
+                occupied.append(server)
+                threading.Thread(target=server.serve_forever, daemon=True).start()
             button("开启.cmd", f"{data / 'persistent'}\n{proxy.server_port}\n")
             assert json.loads(config.read_text(encoding="utf-8"))["proxy"] == f"http://127.0.0.1:{proxy.server_port}"
             for service in ("realtime", "live"):
                 run("start", service)
+            ports = {}
             for service in services:
                 with (data / f"persistent/.control/{service}.json").open(encoding="utf-8") as handle:
-                    assert json.load(handle)["status"] == "running", f"{service} exited during startup"
+                    state = json.load(handle)
+                    assert state["status"] == "running", f"{service} exited during startup"
+                    if service in {"paper", "live", "realtime"}:
+                        ports[service] = state["port"]
+                        assert state["port"] not in (8765, 8766, 8787), "Must bind a separate port"
             # Starting twice must not create a second writer.
             before = (data / "persistent/.control/paper.json").read_bytes()
             button("开启.cmd", "")
             assert (data / "persistent/.control/paper.json").read_bytes() == before
-            for port in (8765, 8766, 8787):
+            for service, port in ports.items():
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 with opener.open(f"http://127.0.0.1:{port}/", timeout=5) as response:
                     assert response.status == 200
-                    assert b"<html" in response.read().lower() or port == 8766
+                    assert b"<html" in response.read().lower() or service == "live"
+            run("open", "paper")
+            assert UnrelatedService.requests == 0, "Launcher must never probe/open another service"
             run("status")
         except BaseException:
             for log in sorted((data / "persistent/launcher_logs").glob("*.log")):
@@ -67,6 +90,9 @@ def smoke(root: Path) -> None:
             button("停止.cmd", "")
             proxy.shutdown()
             proxy.server_close()
+            for server in occupied:
+                server.shutdown()
+                server.server_close()
         # Closed gzip partitions must have trailers and be decompressible.
         for path in (data / "persistent").rglob("*.gz"):
             gzip.decompress(path.read_bytes())
@@ -78,7 +104,7 @@ def smoke(root: Path) -> None:
         assert accounts.read_bytes().startswith(original), "Restart replaced the prior ledger"
         # Includes the launcher and all six worker imports in an isolated,
         # embedded interpreter with external data and Unicode paths.
-        print("WINDOWS PORTABLE SMOKE PASSED: two buttons, first-use port setup, six services, duplicate guard, HTTP, graceful stop, gzip, ledger restart")
+        print("WINDOWS PORTABLE SMOKE PASSED: two buttons, first-use port setup, six services, occupied port fallback, actual URL, duplicate guard, HTTP, graceful stop, gzip, ledger restart")
 
 
 if __name__ == "__main__":

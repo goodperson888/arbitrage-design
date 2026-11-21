@@ -141,13 +141,21 @@
     const generated = Number(state.generatedAtUs || 0);
     const spot = feed.spot;
     const spotAge = spot ? Math.max(0, (generated - Number(spot.sourceUs)) / 1000) : null;
+    const receiveAge = spot ? Math.max(0, (generated - Number(spot.receivedUs)) / 1000) : null;
     const market = state.market;
-    get("candidate-market").textContent = market ? `${market.slug} · 剩余${num(market.remainingSeconds, 1)}秒 · Binance Spot ${num(spot?.price)} · 来源延迟${num(spotAge, 0)}ms` : "等待Polymarket市场";
+    get("candidate-market").textContent = market ? `${market.slug} · 剩余${num(market.remainingSeconds, 1)}秒 · Binance Spot ${num(spot?.price)} · 校时后来源延迟${num(spotAge, 0)}ms · 接收后${num(receiveAge, 0)}ms` : "等待Polymarket市场";
     const statuses = { starting: "正在连接", warming: "正在补齐已收盘K线", live: "已连接", reconnecting: "正在重连" };
     const ruleCount = new Set((c.accounts || []).map((a) => a.rule)).size;
     get("candidate-heading").textContent = `${ruleCount || "六"}个候选，同时观察 UP / DOWN`;
     get("candidate-ledgers").textContent = `查看账本（${(c.accounts || []).length || 12}本账户同时运行）`;
     get("candidate-health").textContent = !c.enabled ? "候选模块尚未启用" : `Binance：${statuses[feed.status] || "等待启动"} · ${feed.error || `${ruleCount}个策略独立运行，页面切换不影响采集`}`;
+    const clock = feed.timeSync;
+    if (c.enabled && clock) {
+      const clockText = clock.status === "synced"
+        ? `服务器校时正常 · 本机${clock.localAheadMs >= 0 ? "快" : "慢"}${num(Math.abs(clock.localAheadMs), 0)}ms · 校时往返${num(clock.roundTripMs, 0)}ms`
+        : `服务器校时${clock.status === "stale" ? "已过期" : "未完成"}，暂停新开仓${clock.error ? ` · ${clock.error}` : ""}`;
+      get("candidate-health").textContent += ` · ${clockText}`;
+    }
     const error = c.runtimeError || c.failure;
     get("candidate-error").hidden = !error;
     get("candidate-error").textContent = error || "";

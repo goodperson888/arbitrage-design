@@ -8,6 +8,28 @@ import unittest
 from arb_research.live.dashboard import load_gate_dashboard_state
 
 
+def test_dashboard_binds_another_port_and_publishes_actual_address(tmp_path, monkeypatch):
+    import socket
+    import urllib.request
+    from arb_research.live.dashboard import DashboardServer
+    ready = tmp_path / "paper.port"
+    monkeypatch.setenv("ARB_WEB_READY_FILE", str(ready))
+    with socket.socket() as occupied:
+        occupied.bind(("127.0.0.1", 0))
+        occupied.listen()
+        original = occupied.getsockname()[1]
+        server = DashboardServer(lambda: {"service": {"status": "live"}}, port=original)
+        try:
+            server.start()
+            assert server.port != original
+            assert int(ready.read_text()) == server.port
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(f"http://127.0.0.1:{server.port}/api/state", timeout=2) as response:
+                assert json.load(response)["service"]["status"] == "live"
+        finally:
+            server.stop()
+
+
 class GateDashboardStateTest(unittest.TestCase):
     def test_merges_recent_gate_paper_events_and_open_positions(self) -> None:
         with TemporaryDirectory() as raw_dir:

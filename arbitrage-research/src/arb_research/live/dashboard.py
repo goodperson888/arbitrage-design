@@ -2,12 +2,24 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import errno
+import os
+import socket
 from pathlib import Path
 import threading
 from typing import Any, Callable
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+
+
+class LocalHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 def load_gate_dashboard_state(state_path: Path | None) -> dict[str, Any] | None:
@@ -119,7 +131,15 @@ class DashboardServer:
             def log_message(self, format: str, *args: Any) -> None:
                 return
 
-        self._server = ThreadingHTTPServer((self.host, self.port), Handler)
+        try:
+            self._server = LocalHTTPServer((self.host, self.port), Handler)
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE and getattr(exc, "winerror", None) not in {10048, 10013}:
+                raise
+            self._server = LocalHTTPServer((self.host, 0), Handler)
+        self.port = self._server.server_address[1]
+        if os.environ.get("ARB_WEB_READY_FILE"):
+            Path(os.environ["ARB_WEB_READY_FILE"]).write_text(str(self.port), encoding="ascii")
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 

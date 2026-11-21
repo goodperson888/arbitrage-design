@@ -16,6 +16,7 @@ import requests
 import websockets
 
 from ..experiments.orderbook_depth import BookLevel, consume_asks, consume_bids
+from ..market_clock import market_clock
 from .log_storage import COMPRESSED_PAPER_STREAMS, disk_space_state, partition_lock
 from .price_history import PriceHistory
 
@@ -30,7 +31,7 @@ def settlement_retry_delay_seconds(base_interval: float, attempts: int, max_dela
 
 
 def now_us() -> int:
-    return time.time_ns() // 1_000
+    return market_clock.now_us()
 
 
 def iso_to_us(value: str) -> int:
@@ -496,7 +497,9 @@ class ResearchPaperMonitor:
         self.store.close()
 
     async def run(self, duration_seconds: float | None = None) -> None:
+        await market_clock.synchronize(self.config.proxy)
         tasks = [
+            asyncio.create_task(market_clock.maintain(self.config.proxy)),
             asyncio.create_task(self._market_loop()),
             asyncio.create_task(self._settlement_loop()),
             asyncio.create_task(self._state_writer_loop()),
@@ -543,6 +546,7 @@ class ResearchPaperMonitor:
                             "asks": [[str(x.price), str(x.size)] for x in relevant],
                             "sourceUs": self.book_source_us.get(token, 0),
                             "receivedUs": self.book_updated_us.get(token, 0),
+                            "clockUncertaintyUs": int((market_clock.snapshot()["uncertaintyMs"] or 0) * 1000),
                         }
                 settlements = dict(self.candidate_settlements)
                 feed = self.candidate_feed.snapshot()
@@ -573,7 +577,7 @@ class ResearchPaperMonitor:
         return await asyncio.to_thread(self._get_json, f"{GAMMA_URL}/markets/slug/{slug}")
 
     async def _discover_current_market(self) -> LiveMarket | None:
-        current_seconds = int(time.time())
+        current_seconds = now_us() // 1_000_000
         base = current_seconds - current_seconds % 300
         candidates = (base, base - 300, base + 300)
         available: list[LiveMarket] = []
@@ -896,6 +900,7 @@ class ResearchPaperMonitor:
         momentum = self._price_momentum(token, entry_source_us)
         cross_market = self._cross_market_context(market, outcome, received_us)
         checks = {
+            "clockSynchronized": not market_clock.enabled or market_clock.snapshot()["status"] == "synced",
             "buySide": payload["side"] == "BUY",
             "priceBand": self.config.price_min <= price <= self.config.price_max,
             "remainingBand": (
@@ -1313,6 +1318,8 @@ class ResearchPaperMonitor:
                     "lastMessageAtUs": str(self.last_message_us) if self.last_message_us else None,
                     "lastError": self.last_error,
                     "dataDir": str(self.config.data_dir.resolve()),
+                    "clock": market_clock.snapshot(),
+                    "dashboardUrl": getattr(self, "dashboard_url", None),
                 },
                 "strategy": self.config.to_public_dict(),
                 "storage": dict(self._disk_state),

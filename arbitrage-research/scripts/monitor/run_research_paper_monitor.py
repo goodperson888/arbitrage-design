@@ -81,8 +81,9 @@ async def run(args: argparse.Namespace) -> None:
         gate_state_path=(data_root or ROOT / "data") / "gate_monitor/state/latest.json",
     )
     dashboard.start()
+    monitor.dashboard_url = f"http://{args.host}:{dashboard.port}/"
     print("Research paper monitor started")
-    print(f"Dashboard: http://{args.host}:{args.port}")
+    print(f"Dashboard: {monitor.dashboard_url}")
     print(f"Config: {args.config.resolve()}")
     print(f"Data: {data_dir.resolve()}")
     print("Paper only: no wallet, private key, or real order endpoint is used")

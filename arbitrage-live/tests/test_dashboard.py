@@ -35,6 +35,23 @@ class FakeIdentityManager:
 
 
 class DashboardTests(unittest.TestCase):
+    def test_busy_port_switches_without_touching_existing_listener(self) -> None:
+        import socket
+        from unittest.mock import patch
+        with TemporaryDirectory() as temporary, socket.socket() as occupied:
+            occupied.bind(("127.0.0.1", 0))
+            occupied.listen()
+            original = occupied.getsockname()[1]
+            ready = Path(temporary) / "live.port"
+            with patch.dict("os.environ", {"ARB_WEB_READY_FILE": str(ready)}):
+                server = DashboardServer(Path(temporary), port=original)
+                try:
+                    server.start()
+                    self.assertNotEqual(server.port, original)
+                    self.assertEqual(int(ready.read_text()), server.port)
+                finally:
+                    server.stop()
+
     def test_runtime_overlay_distinguishes_preflight_ready_from_submission_enabled(self) -> None:
         state = {"safety": {"ordersDisabled": True, "transport": "DISABLED"}, "service": {}, "overview": {}}
         runner = {"status": "running", "mode": "canary", "freshnessVerified": True}

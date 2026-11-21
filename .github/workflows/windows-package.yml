@@ -37,6 +37,7 @@ jobs:
       - name: Test portable storage, strategy regressions and launcher
         run: >-
           python -m pytest -q --import-mode=importlib tools/windows/tests
+          arbitrage-research/tests/test_market_clock.py
           arbitrage-research/tests/test_monitor_hot_path.py
           arbitrage-research/tests/test_candidate_paper.py
           arbitrage-research/tests/test_candidate_observations.py

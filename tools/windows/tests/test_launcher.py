@@ -31,6 +31,22 @@ def test_external_data_survives_configuration_and_commands(tmp_path, monkeypatch
     assert ledger.read_bytes() == b"existing account"
 
 
+def test_browser_and_status_use_recorded_actual_port(tmp_path, monkeypatch, capsys):
+    data = tmp_path / "data"
+    settings = tmp_path / "settings.json"
+    monkeypatch.setenv("ARB_SETTINGS_FILE", str(settings))
+    manager.write_json(settings, {"data_root": str(data), "proxy": ""})
+    manager.write_json(manager.control_dir(data) / "paper.json", {"port": 49321})
+    opened = []
+    monkeypatch.setattr(manager.webbrowser, "open", opened.append)
+    monkeypatch.setattr(sys, "argv", ["manager", "open", "paper"])
+    assert manager.main() == 0
+    assert opened == ["http://127.0.0.1:49321/"]
+    monkeypatch.setattr(manager, "is_running", lambda _, name: name == "paper")
+    manager.status(manager.load_settings())
+    assert "http://127.0.0.1:49321/" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("bad", [str(ROOT / "data"), str(Path(ROOT.anchor)), "relative/data"])
 def test_rejects_data_inside_app_or_ambiguous_root(tmp_path, monkeypatch, bad):
     config = tmp_path / "launcher.json"

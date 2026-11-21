@@ -89,7 +89,8 @@ def buy_budget(levels, budget: Decimal, cap: Decimal):
 
 
 def fresh(value: dict | None, now: int):
-    return bool(value and all(0 <= now - int(value.get(key, 0)) <= 2 * SECOND
+    tolerance = min(501_000, max(0, int((value or {}).get("clockUncertaintyUs", 0))))
+    return bool(value and all((-tolerance if key == "sourceUs" else 0) <= now - int(value.get(key, 0)) <= 2 * SECOND
                               for key in ("sourceUs", "receivedUs")))
 
 
@@ -239,6 +240,8 @@ class CandidateEngine:
                     for p in (a["position"], a["pending"]) if p]
 
     def _signal(self, a, market, feed, now):
+        if "timeSync" in feed and feed["timeSync"].get("status") != "synced":
+            return None, "服务器校时未就绪或已过期，暂停新开仓", {}
         remaining = (market["endUs"] - now) / SECOND
         if not 30 <= remaining <= 270:
             return None, "等待剩余270–30秒", {}
@@ -369,7 +372,8 @@ class CandidateEngine:
             self.settle(market_id, label["winner"], label["receivedUs"])
         for original in list(self.accounts.values()):
             if original["pending"]:
-                self._execute(deepcopy(original), market, books, now)
+                clock_ready = "timeSync" not in feed or feed["timeSync"].get("status") == "synced"
+                self._execute(deepcopy(original), market, books if clock_ready else {}, now)
         grid = now // SECOND
         if grid == self.last_grid:
             return
@@ -385,9 +389,9 @@ class CandidateEngine:
         self.coverage["indicatorReadySeconds"] += int(eligible and all(
             int(r["availableUs"]) <= now < int(r["barEndUs"]) + 60 * SECOND
             for r in feed.get("indicators", {}).values()) and len(feed.get("indicators", {})) == 2)
-        health = (feed.get("status"), feed.get("error"))
+        health = (feed.get("status"), feed.get("error"), feed.get("timeSync", {}).get("status"))
         if health != self.last_health:
-            self._append("FEED_STATUS", now, status=health[0], error=health[1])
+            self._append("FEED_STATUS", now, status=health[0], error=health[1], timeSync=feed.get("timeSync"))
             self.last_health = health
         # One shared compact observation per second for all virtual accounts.
         if eligible:

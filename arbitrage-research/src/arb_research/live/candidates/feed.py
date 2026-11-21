@@ -10,13 +10,14 @@ import httpx
 import websockets
 
 from .indicators import Supertrend, MINUTE
+from ...market_clock import market_clock
 
 REST = "https://api.binance.com/api/v3/klines"
 WS = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/btcusdt@kline_1m"
 
 
 def clock_us():
-    return time.time_ns() // 1000
+    return market_clock.now_us()
 
 
 class BinanceFeed:
@@ -88,7 +89,9 @@ class BinanceFeed:
                         if value.get("e") == "trade":
                             source = int(value["T"]) * 1000
                             if self.spot is None or source >= self.spot["sourceUs"]:
-                                self.spot = {"price": float(value["p"]), "sourceUs": source, "receivedUs": received}
+                                self.spot = {"price": float(value["p"]), "sourceUs": source, "receivedUs": received,
+                                             "localReceivedUs": time.time_ns() // 1000,
+                                             "clockUncertaintyUs": int((market_clock.snapshot()["uncertaintyMs"] or 0) * 1000)}
                         elif value.get("e") == "kline":
                             k = value["k"]
                             self.accept_bar({"openUs": int(k["t"]) * 1000,
@@ -114,4 +117,5 @@ class BinanceFeed:
     def snapshot(self):
         # Replaced objects, not references to mutable recursive state.
         return {"status": self.status, "error": self.error, "reconnections": self.reconnections,
-                "spot": self.spot, "indicators": dict(self.indicators), "opens": dict(self.opens)}
+                "spot": self.spot, "indicators": dict(self.indicators), "opens": dict(self.opens),
+                "timeSync": market_clock.snapshot()}

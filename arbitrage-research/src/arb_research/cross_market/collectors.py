@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
+from ..market_clock import market_clock
 from typing import Any, Awaitable, Callable
 
 try:
@@ -16,7 +16,7 @@ StatusCallback = Callable[[str, str, str | None], Awaitable[None]]
 
 
 def _now_us() -> int:
-    return time.time_ns() // 1_000
+    return market_clock.now_us()
 
 
 class ReconnectingCollector:
@@ -371,7 +371,7 @@ class DeribitCollector(ReconnectingCollector):
                 "currency": "BTC", "kind": "option", "expired": False
             })
             selected = self.select_option_instruments(
-                instruments or [], float(index["index_price"]), int(time.time() * 1_000),
+                instruments or [], float(index["index_price"]), _now_us() // 1_000,
                 self.option_strikes_each_side,
             )
             await self.on_update(

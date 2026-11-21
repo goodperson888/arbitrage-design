@@ -20,6 +20,7 @@ from ..cross_market.collectors import (
     PolymarketReferenceCollector,
 )
 from ..cross_market.state import CrossMarketState
+from ..market_clock import market_clock
 from ..experiments.orderbook_depth import BookLevel, consume_asks, consume_bids
 from .strategy_monitor import (
     GAMMA_URL,
@@ -278,7 +279,7 @@ class CrossMarketValidationService:
         return await asyncio.to_thread(self._get_json, f"{GAMMA_URL}/markets/slug/{slug}")
 
     async def _discover_current_market(self) -> LiveMarket | None:
-        current_seconds = int(time.time())
+        current_seconds = now_us() // 1_000_000
         duration_seconds = self.config.market_duration_minutes * 60
         base = current_seconds - current_seconds % duration_seconds
         for start_seconds in (base, base - duration_seconds, base + duration_seconds):
@@ -739,6 +740,7 @@ class CrossMarketValidationService:
         self.request_stop()
 
     async def run(self, duration_seconds: float | None = None) -> None:
+        await market_clock.synchronize(self.config.proxy)
         collectors = (
             BinanceCollector(self._on_update, self._on_status, proxy=self.config.proxy),
             BinanceFuturesCollector(self._on_update, self._on_status, proxy=self.config.proxy),
@@ -753,6 +755,7 @@ class CrossMarketValidationService:
         )
         tasks = [asyncio.create_task(item.run(self.stop_event)) for item in collectors]
         tasks.extend([
+            asyncio.create_task(market_clock.maintain(self.config.proxy)),
             asyncio.create_task(self._market_loop()), asyncio.create_task(self._snapshot_loop()),
             asyncio.create_task(self._settlement_loop()), asyncio.create_task(self._state_writer_loop()),
         ])
@@ -787,6 +790,7 @@ class CrossMarketValidationService:
                 "status": "running" if not self.stop_event.is_set() else "stopped",
                 "startedAtUs": str(self.started_us), "dataDir": str(self.config.data_dir.resolve()),
                 "paperOnly": True, "placesOrders": False,
+                "clock": market_clock.snapshot(),
             },
             "sources": dict(self.statuses), "config": self.config.to_public_dict(),
             "market": {

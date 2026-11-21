@@ -60,6 +60,22 @@ def test_all_twelve_accounts_independent_and_direction_shared(engine):
     assert all(a["fills"] == 1 and a["position"]["side"] == "UP" for a in engine.accounts.values())
 
 
+@pytest.mark.parametrize("status", ["pending", "stale"])
+def test_untrusted_clock_blocks_all_candidate_entries(engine, status):
+    at = NOW + 2 * SECOND
+    f = dict(feed(at), timeSync={"status": status})
+    tick(engine, at, f=f)
+    assert all(a["pending"] is None for a in engine.accounts.values())
+    assert all("校时" in reason for reason in engine.reasons.values())
+
+
+def test_clock_expiry_during_execution_never_fills_pending_orders(engine):
+    at = NOW + 2 * SECOND
+    tick(engine, at, f=dict(feed(at), timeSync={"status": "synced"}))
+    tick(engine, at + 300_000, f=dict(feed(at + 300_000), timeSync={"status": "stale"}))
+    assert all(a["fills"] == 0 and a["pending"] is None for a in engine.accounts.values())
+
+
 def test_pnl_fees_and_martin_only_update_from_official_label(engine):
     at = NOW + 2 * SECOND
     tick(engine, at)

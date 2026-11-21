@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import errno
 import importlib.util
 import os
+import socket
 import signal
 import subprocess
 import sys
@@ -23,6 +25,17 @@ from .settings import ADDRESS_RE, KeychainSecretStore, PolygonAccountDetector, S
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+
+
+class LocalHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 COUNT_STREAMS = ("events", "signals", "orders", "fills", "settlements", "health", "sessions")
 
 
@@ -975,8 +988,15 @@ class DashboardServer:
             def log_message(self, _format: str, *_args: Any) -> None:
                 return
 
-        self._server = ThreadingHTTPServer((self.host, self.port), Handler)
+        try:
+            self._server = LocalHTTPServer((self.host, self.port), Handler)
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE and getattr(exc, "winerror", None) not in {10048, 10013}:
+                raise
+            self._server = LocalHTTPServer((self.host, 0), Handler)
         self.port = self._server.server_address[1]
+        if os.environ.get("ARB_WEB_READY_FILE"):
+            Path(os.environ["ARB_WEB_READY_FILE"]).write_text(str(self.port), encoding="ascii")
         self._thread = threading.Thread(target=self._server.serve_forever, name="live-dashboard", daemon=True)
         self._thread.start()
 
