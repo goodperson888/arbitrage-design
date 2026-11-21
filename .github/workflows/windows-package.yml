@@ -58,6 +58,11 @@ jobs:
           $relocatedApp = Join-Path $env:RUNNER_TEMP 'Arbitrage Design 中文'
           Move-Item -LiteralPath dist/windows/ArbitrageDesign -Destination $relocatedApp
           python tools/windows/smoke_test.py "$relocatedApp"
+      - name: Test automatic setup without an installed runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $relocatedApp = Join-Path $env:RUNNER_TEMP 'Arbitrage Design 中文'
           python tools/windows/bootstrap_smoke_test.py "$relocatedApp"
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4
