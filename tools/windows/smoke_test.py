@@ -16,6 +16,8 @@ import urllib.request
 def smoke(root: Path) -> None:
     python = root / "runtime/python.exe"
     manager = root / "tools/windows/manager.py"
+    subprocess.run([str(python), str(root / "tools/windows/verify_runtime.py")],
+                   cwd=root, check=True, timeout=60)
     with tempfile.TemporaryDirectory(prefix="Arbitrage Data 中文 ") as temporary:
         data = Path(temporary)
         config = data / "settings.json"

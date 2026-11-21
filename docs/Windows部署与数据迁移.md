@@ -14,6 +14,10 @@ GitHub 的绿色 **Code → Download ZIP** 下载的是源码，不包含便携�
 
 包里的 `build-info.json` 记录对应代码提交、运行时版本及校验值；`dependency-lock.json` 记录本次包内的全部依赖版本及各 wheel 的 SHA-256。运行依赖安装后不需要联网下载，行情采集本身仍需网络连接。
 
+便携包使用采集运行依赖：保留 PyArrow、数据压缩、盘口监控、账本与页面所需模块；不携带离线回测使用的 NumPy、DuckDB、Polars，也不携带项目测试和依赖测试素材、Arrow 编译头文件。依赖的运行数据、原生动态库、许可证和版本元数据保留。`runtime/dependency-layout.json` 记录精简文件数量和字节数；完整包和自动安装使用相同的精简规则。历史数据格式和策略规则不变，数据仍可同步回 Mac 回测。
+
+如果需要在 Windows 开发环境运行离线分析，请单独创建 Python 虚拟环境，安装 `tools/windows/requirements-test.txt` 和相应项目；不要向便携包的 `runtime` 安装分析或开发依赖。
+
 ## 第一次启动
 
 根目录只保留两个操作入口：

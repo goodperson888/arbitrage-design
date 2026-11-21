@@ -23,6 +23,8 @@ def smoke(root: Path) -> None:
         run("doctor")
         assert (root / "runtime/python.exe").is_file()
         assert (root / "runtime/node/node.exe").is_file()
+        subprocess.run([str(root / "runtime/python.exe"), str(root / "tools/windows/verify_runtime.py")],
+                       env=env, cwd=root, check=True, timeout=60)
         assert not list(root.glob(".runtime-setup-*/")), "Temporary installers must be cleaned"
         # Reuses the completed installation and doesn't replace it.
         before = (root / "runtime/python.exe").stat().st_mtime_ns

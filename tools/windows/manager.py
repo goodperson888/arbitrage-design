@@ -356,7 +356,7 @@ def status(config: dict) -> None:
 
 def doctor(config: dict) -> None:
     import importlib
-    for name in ("httpx", "requests", "websockets", "python_socks", "pyarrow", "duckdb", "polars", "tzdata", "py_clob_client_v2", "eth_account"):
+    for name in ("httpx", "requests", "websockets", "python_socks", "pyarrow", "tzdata", "py_clob_client_v2", "eth_account"):
         importlib.import_module(name)
         print(f"依赖正常：{name}")
     from zoneinfo import ZoneInfo

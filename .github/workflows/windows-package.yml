@@ -27,10 +27,12 @@ jobs:
           python-version: '3.12.10'
           architecture: x64
           cache: pip
-          cache-dependency-path: tools/windows/requirements.txt
+          cache-dependency-path: |
+            tools/windows/requirements.txt
+            tools/windows/requirements-test.txt
       - name: Install test dependencies
         run: |
-          python -m pip install -r tools/windows/requirements.txt pytest==9.2.0
+          python -m pip install -r tools/windows/requirements-test.txt
           python -m pip install --no-deps -e arbitrage-research -e arbitrage-live -e arbitrage-realtime
       - name: Test portable storage, strategy regressions and launcher
         run: >-
@@ -49,7 +51,7 @@ jobs:
           arbitrage-realtime/tests
       - name: Test Gate parser without browser dependencies
         run: node --test arbitrage-research/tests/node/gate_low_frequency_monitor.test.mjs
-      - name: Build portable runtime and offline dependencies
+      - name: Build optimized portable collector runtime
         run: python tools/windows/build.py --output dist/windows
       - name: Test relocated portable package on Windows
         shell: pwsh

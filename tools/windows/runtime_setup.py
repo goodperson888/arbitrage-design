@@ -10,9 +10,12 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from package_layout import copy_runtime_packages
+
 ROOT = Path(__file__).resolve().parents[2]
 DEPENDENCIES = ("httpx", "requests", "websockets", "python_socks", "pyarrow",
-                "numpy", "duckdb", "polars", "tzdata", "py_clob_client_v2", "eth_account")
+                "tzdata", "py_clob_client_v2", "eth_account")
 
 
 def check(runtime: Path) -> None:
@@ -43,9 +46,12 @@ def install(runtime: Path, downloads: Path) -> None:
     if proxy:
         command += ["--proxy", proxy]
     subprocess.run(command, check=True)
+    packages = downloads / "installed-packages"
     subprocess.run([sys.executable, "-m", "pip", "--isolated", "install", "--no-index", "--no-compile",
-                    "--find-links", str(wheels), "--target", str(runtime / "Lib/site-packages"),
+                    "--find-links", str(wheels), "--target", str(packages),
                     "-r", str(ROOT / "tools/windows/requirements.txt")], check=True)
+    layout = copy_runtime_packages(packages, runtime / "Lib/site-packages")
+    (runtime / "dependency-layout.json").write_text(json.dumps(layout, indent=2), encoding="utf-8")
     # New process so imports see the freshly installed packages.
     subprocess.run([sys.executable, str(Path(__file__).resolve()), "check", str(runtime)], check=True)
 

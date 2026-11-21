@@ -12,6 +12,9 @@ import tempfile
 import urllib.request
 import zipfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from package_layout import copy_runtime_packages
+
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SPEC = json.loads((ROOT / "tools/windows/runtime-spec.json").read_text(encoding="utf-8"))
 PYTHON_URL, PYTHON_SHA256 = (RUNTIME_SPEC["python"][key] for key in ("url", "sha256"))
@@ -53,7 +56,7 @@ def build(destination: Path) -> Path:
             raise ValueError(f"Unexpected private/generated file in Git index: {name}")
         if (relative.name.startswith(".env") and relative.name != ".env.example") or relative.suffix in {".pem", ".key", ".pfx", ".p12"}:
             raise ValueError(f"Unexpected credential file: {name}")
-        if relative.parts[0] == ".github" or relative.name == ".gitignore":
+        if relative.parts[0] == ".github" or relative.name == ".gitignore" or "tests" in relative.parts:
             continue
         source = ROOT / name
         if source.is_symlink():
@@ -77,7 +80,7 @@ def build(destination: Path) -> Path:
         wheels = scratch / "wheels"
         subprocess.run([sys.executable, "-m", "pip", "download", "--only-binary=:all:",
                         "--dest", str(wheels), "-r", str(ROOT / "tools/windows/requirements.txt")], check=True)
-        packages = runtime / "Lib/site-packages"
+        packages = scratch / "installed-packages"
         subprocess.run([sys.executable, "-m", "pip", "install", "--no-index", "--no-compile",
                         "--find-links", str(wheels), "--target", str(packages),
                         "-r", str(ROOT / "tools/windows/requirements.txt")], check=True)
@@ -85,11 +88,13 @@ def build(destination: Path) -> Path:
                            for p in sorted(wheels.glob("*.whl"))]}
         lock["versions"] = json.loads(subprocess.check_output(
             [sys.executable, "-m", "pip", "list", "--path", str(packages), "--format=json"]))
+        layout = copy_runtime_packages(packages, runtime / "Lib/site-packages")
     (runtime / "python312._pth").write_text(
         "python312.zip\n.\nLib/site-packages\n../arbitrage-research/src\n"
         "../arbitrage-live/src\n../arbitrage-realtime/src\nimport site\n", encoding="utf-8")
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     (app / "dependency-lock.json").write_text(json.dumps(lock, indent=2), encoding="utf-8")
+    (runtime / "dependency-layout.json").write_text(json.dumps(layout, indent=2), encoding="utf-8")
     (app / "build-info.json").write_text(json.dumps({"commit": commit, "python": "3.12.10",
         "node": "24.22.3", "pythonSha256": PYTHON_SHA256, "nodeSha256": NODE_SHA256,
         "platform": "windows-x64"}, indent=2), encoding="utf-8")
@@ -104,6 +109,9 @@ def build(destination: Path) -> Path:
                 output.write(path, path.relative_to(destination))
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     (destination / "SHA256SUMS.txt").write_text(f"{digest}  {archive.name}\n", encoding="ascii")
+    with zipfile.ZipFile(archive) as result:
+        entries = result.infolist()
+        print(f"Package: {len(entries)} files; extracted {sum(p.file_size for p in entries) / 1048576:.1f} MiB")
     print(f"Built {archive} ({archive.stat().st_size / 1048576:.1f} MiB); commit {commit}")
     return archive
 
