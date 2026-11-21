@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import queue
 import sqlite3
+from contextlib import closing
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ class CriticalLedger:
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self.ndjson_path.parent.mkdir(parents=True, exist_ok=True)
         self.accepting_orders = True
-        with sqlite3.connect(self.sqlite_path) as connection:
+        with closing(sqlite3.connect(self.sqlite_path)) as connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS ledger_events ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, "
@@ -36,7 +37,7 @@ class CriticalLedger:
         }
         try:
             payload_json = json.dumps(payload, sort_keys=True, default=str)
-            with sqlite3.connect(self.sqlite_path) as connection:
+            with closing(sqlite3.connect(self.sqlite_path)) as connection:
                 connection.execute(
                     "INSERT INTO ledger_events(event_type, recorded_at, payload_json) VALUES (?, ?, ?)",
                     (event["event_type"], event["recorded_at"], payload_json),

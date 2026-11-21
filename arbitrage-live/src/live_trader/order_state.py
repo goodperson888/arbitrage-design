@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -86,7 +87,7 @@ class SQLiteOrderStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS orders ("
                 "client_order_id TEXT PRIMARY KEY, market_id TEXT NOT NULL, token_id TEXT NOT NULL,"
@@ -95,7 +96,7 @@ class SQLiteOrderStore:
             connection.commit()
 
     def save(self, record: OrderRecord) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection:
             connection.execute(
                 "INSERT OR REPLACE INTO orders(client_order_id, market_id, token_id, state, payload_json, remote_order_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (record.client_order_id, record.market_id, record.token_id, record.state.value, json.dumps(record.payload, sort_keys=True, default=str), record.remote_order_id, datetime.now(timezone.utc).isoformat()),
@@ -103,20 +104,20 @@ class SQLiteOrderStore:
             connection.commit()
 
     def get(self, client_order_id: str) -> OrderRecord:
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection:
             row = connection.execute("SELECT client_order_id, market_id, token_id, state, payload_json, remote_order_id FROM orders WHERE client_order_id = ?", (client_order_id,)).fetchone()
         if row is None:
             raise KeyError(client_order_id)
         return OrderRecord(row[0], row[1], row[2], OrderState(row[3]), json.loads(row[4]), row[5])
 
     def list_all(self) -> List[OrderRecord]:
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection:
             rows = connection.execute("SELECT client_order_id, market_id, token_id, state, payload_json, remote_order_id FROM orders ORDER BY updated_at").fetchall()
         return [OrderRecord(row[0], row[1], row[2], OrderState(row[3]), json.loads(row[4]), row[5]) for row in rows]
 
     def claim_submission(self, client_order_id: str) -> bool:
         """Atomically claim an unsent intent, including across runner instances."""
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection:
             changed = connection.execute(
                 "UPDATE orders SET state = ?, updated_at = ? WHERE client_order_id = ? AND state = ?",
                 (OrderState.SUBMITTING.value, datetime.now(timezone.utc).isoformat(), client_order_id, OrderState.INTENT.value),
