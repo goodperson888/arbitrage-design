@@ -146,6 +146,52 @@ def is_running(directory: Path, name: str) -> bool:
     return False
 
 
+@contextmanager
+def windows_process_witness(pid: int, expected_birth: int | None = None):
+    """Wait on a verified process handle, never a possibly reused PID."""
+    if os.name != "nt":
+        yield None, lambda: True
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = (wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4))
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.OpenProcess(0x100000 | 0x1000, False, pid)  # SYNCHRONIZE + query, no terminate rights
+    if not handle:
+        yield None, lambda: True
+        return
+    try:
+        times = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel.GetProcessTimes(handle, *(ctypes.byref(value) for value in times)):
+            raise OSError("无法确认服务进程身份，请稍后重试停止")
+        birth = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        if expected_birth is not None and birth != expected_birth:
+            yield None, lambda: True
+        else:
+            yield birth, lambda: kernel.WaitForSingleObject(handle, 0) == 0
+    finally:
+        kernel.CloseHandle(handle)
+
+
+@contextmanager
+def worker_exit_witness(directory: Path, name: str):
+    try:
+        state = json.loads((control_dir(directory) / f"{name}.json").read_text(encoding="utf-8"))
+        pid, birth = int(state["pid"]), int(state["processCreatedTicks"])
+    except (OSError, ValueError, KeyError, TypeError):
+        yield lambda: True
+        return
+    with windows_process_witness(pid, birth) as (_, exited):
+        yield exited
+
+
 def command_for(name: str, directory: Path, proxy: str, stop: Path) -> tuple[list[str], Path]:
     research = ROOT / "arbitrage-research"
     common = ["--stop-file", str(stop)]
@@ -246,16 +292,17 @@ def start_one(config: dict, name: str) -> None:
 
 
 def stop_one(directory: Path, name: str, timeout: float = 60) -> bool:
-    if not is_running(directory, name):
-        print(f"{name} 已停止")
-        return True
-    (control_dir(directory) / f"{name}.stop").touch()
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not is_running(directory, name):
-            print(f"{name} 已正常停止，数据保留")
+    with worker_exit_witness(directory, name) as exited:
+        if not is_running(directory, name) and exited():
+            print(f"{name} 已停止")
             return True
-        time.sleep(0.2)
+        (control_dir(directory) / f"{name}.stop").touch()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if not is_running(directory, name) and exited():
+                print(f"{name} 已正常停止，数据保留")
+                return True
+            time.sleep(0.2)
     print(f"{name} 仍在收尾；已请求停止，未强制终止。稍后再检查状态。")
     return False
 
@@ -267,6 +314,9 @@ def worker(config: dict, name: str, boot: str) -> int:
     with exclusive_lock(control / f"{name}.lock"):
         state = {"service": name, "pid": os.getpid(), "boot": boot,
                  "startedAt": datetime.now(timezone.utc).isoformat(), "status": "running"}
+        with windows_process_witness(os.getpid()) as (birth, _):
+            if birth is not None:
+                state["processCreatedTicks"] = birth
         write_json(control / f"{name}.json", state)
         previous = Path.cwd()
         try:

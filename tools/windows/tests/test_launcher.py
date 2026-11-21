@@ -152,3 +152,39 @@ def test_stop_before_first_run_does_not_prompt_or_create_settings(tmp_path, monk
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("stop must never configure"))
     assert manager.main() == 0
     assert not path.exists()
+
+
+def test_stop_waits_for_process_exit_after_writer_releases_lock(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    polls = []
+    @contextmanager
+    def witness(*args):
+        def exited():
+            polls.append(True)
+            return len(polls) >= 3
+        yield exited
+    monkeypatch.setattr(manager, "worker_exit_witness", witness)
+    monkeypatch.setattr(manager, "is_running", lambda *_: False)
+    monkeypatch.setattr(manager.time, "sleep", lambda _: None)
+    assert manager.stop_one(tmp_path, "paper")
+    assert len(polls) == 3
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process handle identity")
+def test_windows_witness_waits_for_exact_process_and_rejects_wrong_birth():
+    import subprocess
+    import os
+    with manager.windows_process_witness(os.getpid()) as (birth, exited):
+        assert birth is not None
+        assert not exited()
+    with manager.windows_process_witness(os.getpid(), birth + 1) as (matched, exited):
+        assert matched is None
+        assert exited()  # PID without matching creation time is not our worker.
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.2)"])
+    try:
+        with manager.windows_process_witness(process.pid) as (child_birth, exited):
+            assert child_birth is not None
+            process.wait(timeout=10)
+            assert exited()
+    finally:
+        process.wait(timeout=10)
