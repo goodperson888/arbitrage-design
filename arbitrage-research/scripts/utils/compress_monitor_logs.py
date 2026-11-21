@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
-import os
 from pathlib import Path
 
 from arb_research.live.log_storage import archive_candidates, archive_partition
+from arb_research.platform_io import exclusive_lock
 
 
 def main() -> int:
@@ -24,9 +23,7 @@ def main() -> int:
                       "last": str(paths[-1]) if paths else None}), flush=True)
     if not args.apply:
         return 0
-    descriptor = os.open(root / ".storage-archive.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(descriptor, "a+b") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with exclusive_lock(root / ".storage-archive.lock"):
         saved = archived = active = 0
         for index, path in enumerate(paths, 1):
             entry = archive_partition(root, path)

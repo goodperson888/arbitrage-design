@@ -69,3 +69,6 @@ artifacts_work/
 *.prof
 *.zip
 *.tar.gz
+runtime/
+dependency-lock.json
+build-info.json

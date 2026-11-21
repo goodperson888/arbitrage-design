@@ -6,7 +6,6 @@ are backed up before replacement; account journals are never touched.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import fcntl
 import gzip
 import hashlib
 import json
@@ -16,6 +15,8 @@ import re
 import stat
 import tempfile
 import zlib
+
+from arb_research.platform_io import exclusive_lock
 
 MAX_COMPRESSED = 64 * 1024 * 1024
 MAX_RECOVERED = 256 * 1024 * 1024
@@ -50,9 +51,7 @@ def repair_observations(directory: Path, *, apply: bool = False) -> list[dict]:
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("Expected an existing candidate directory, not a symbolic link")
     directory = directory.resolve()
-    descriptor = os.open(directory / "writer.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(descriptor, "a+b") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with exclusive_lock(directory / "writer.lock"):
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
         results = []
         observations = directory / "observations"

@@ -802,6 +802,7 @@ class DashboardServer:
         )
         self.last_account_detection: dict[str, Any] | None = None
         self.runner_popen = runner_popen or subprocess.Popen
+        self._native_runner_process = runner_popen is None
         self.sdk_available = sdk_available or (
             lambda: importlib.util.find_spec("py_clob_client_v2") is not None
         )
@@ -1231,7 +1232,11 @@ class DashboardServer:
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1]) + os.pathsep + env.get("PYTHONPATH", "")
         env["ARBITRAGE_LIVE_DASHBOARD_STARTED"] = "1"
         runner_python = os.environ.get("ARBITRAGE_PYTHON_BIN", sys.executable)
-        command = [runner_python, "-m", "live_trader.cli", "run", "--data-dir", str(self.data_dir)]
+        if os.name == "nt":
+            stop_path = self.data_dir / ".runner.stop"
+            stop_path.unlink(missing_ok=True)
+            env["LIVE_RUNNER_STOP_FILE"] = str(stop_path.resolve())
+        command = [runner_python, "-X", "utf8", "-m", "live_trader.cli", "run", "--data-dir", str(self.data_dir)]
         try:
             self.runner_process = self.runner_popen(
                 command,
@@ -1280,6 +1285,16 @@ class DashboardServer:
         # platforms without send_signal fall back to terminate().
         self.settings_store.save({"orderSubmissionEnabled": False})
         if process is not None and process.poll() is None:
+            if os.name == "nt" and self._native_runner_process:
+                (self.data_dir / ".runner.stop").touch()
+                try:
+                    process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("交易进程仍在刷新账本，已暂停新下单；稍后重试停止，未强制终止") from None
+                self.runner_process = None
+                self.runner_mode = None
+                self.runner_submission_ready = False
+                return {"status": "stopped", "pid": None, "mode": None}
             send_signal = getattr(process, "send_signal", None)
             if callable(send_signal):
                 try:

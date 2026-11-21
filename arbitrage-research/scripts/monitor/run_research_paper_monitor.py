@@ -6,7 +6,6 @@ import asyncio
 from decimal import Decimal
 import json
 from pathlib import Path
-import signal
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from arb_research.live.dashboard import DashboardServer
 from arb_research.live.strategy_monitor import LiveMonitorConfig, ResearchPaperMonitor
+from arb_research.runtime_control import shutdown_control
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +26,8 @@ def parse_args() -> argparse.Namespace:
         default=ROOT / "configs/research/live_paper_monitor_v1.json",
     )
     parser.add_argument("--data-dir", type=Path, help="Override config data_dir")
+    parser.add_argument("--data-root", type=Path, help="Root shared with cross-market and Gate collectors")
+    parser.add_argument("--stop-file", type=Path, help="Graceful background shutdown request")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--proxy", help="Optional HTTP/HTTPS/WebSocket proxy URL")
@@ -37,6 +39,7 @@ def parse_args() -> argparse.Namespace:
 async def run(args: argparse.Namespace) -> None:
     raw = json.loads(args.config.read_text())
     data_dir = args.data_dir or ROOT / str(raw["data_dir"])
+    data_root = getattr(args, "data_root", None)
     config = LiveMonitorConfig(
         data_dir=data_dir,
         strategy_id=str(raw.get("monitor_id", "up_down_active_vwap80_85_remaining90_30_momentum5_01_v1")),
@@ -58,7 +61,7 @@ async def run(args: argparse.Namespace) -> None:
         raw_book_interval_ms=int(raw["raw_book_interval_ms"]),
         stable_book_ms=int(raw.get("stable_book_ms", 0)),
         cross_market_state_path=(
-            ROOT / str(raw["cross_market_state_path"])
+            ((data_root / "cross_market_validation/state/latest.json") if data_root else ROOT / str(raw["cross_market_state_path"]))
             if raw.get("cross_market_state_path") else None
         ),
         cross_market_max_age_ms=int(raw.get("cross_market_max_age_ms", 2500)),
@@ -75,7 +78,7 @@ async def run(args: argparse.Namespace) -> None:
         monitor.get_state,
         args.host,
         args.port,
-        gate_state_path=ROOT / "data/gate_monitor/state/latest.json",
+        gate_state_path=(data_root or ROOT / "data") / "gate_monitor/state/latest.json",
     )
     dashboard.start()
     print("Research paper monitor started")
@@ -84,15 +87,10 @@ async def run(args: argparse.Namespace) -> None:
     print(f"Data: {data_dir.resolve()}")
     print("Paper only: no wallet, private key, or real order endpoint is used")
 
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, monitor.request_stop)
-        except NotImplementedError:
-            pass
     try:
         duration = args.duration_hours * 3600 if args.duration_hours else None
-        await monitor.run(duration)
+        async with shutdown_control(monitor.request_stop, getattr(args, "stop_file", None)):
+            await monitor.run(duration)
     finally:
         dashboard.stop()
 

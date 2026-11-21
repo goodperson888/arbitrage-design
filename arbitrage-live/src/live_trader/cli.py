@@ -147,12 +147,23 @@ async def _run_network(args: argparse.Namespace) -> int:
         # reach the transport.  The operator can repair the failed check and
         # restart before enabling new orders.
         print("ORDER_SUBMISSION_DISABLED: continuing market monitoring; no orders will be submitted")
+    task = asyncio.create_task(runner.run_forever())
     try:
-        await runner.run_forever()
+        stop_path = getattr(args, "stop_file", None)
+        while not task.done():
+            if stop_path is not None and stop_path.exists():
+                runner._order_submission_enabled = False
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+                return 0
+            await asyncio.wait({task}, timeout=0.2)
+        await task
     except ReadOnlyNetworkDisabled as exc:
         print(f"BLOCKED network: {exc}")
         return 2
     finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
         runner.close()
     return 0
 
@@ -167,6 +178,7 @@ def main() -> int:
     parser.add_argument("--strategy-file", type=Path, default=Path("config/strategy_down_spot5m_v1.json"))
     parser.add_argument("--recording-policy-file", type=Path, default=Path("config/recording_policy.json"))
     parser.add_argument("--proxy", default=os.environ.get("LIVE_PROXY"))
+    parser.add_argument("--stop-file", type=Path, default=(Path(os.environ["LIVE_RUNNER_STOP_FILE"]) if os.environ.get("LIVE_RUNNER_STOP_FILE") else None))
     args = parser.parse_args()
 
     if args.mode == "run":
@@ -191,13 +203,25 @@ def main() -> int:
         server.start()
         print(f"dashboard=http://{args.host}:{server.port} data={args.data_dir.resolve()}")
         try:
-            while True:
+            while args.stop_file is None or not args.stop_file.exists():
                 import time
 
                 time.sleep(1)
         except KeyboardInterrupt:
+            pass
+        finally:
+            while True:
+                try:
+                    server.stop_runner()
+                    break
+                except RuntimeError:
+                    # Keep the launcher lock while the owned child is still
+                    # flushing, so a second dashboard cannot start over it.
+                    if server.runner_process is None or server.runner_process.poll() is not None:
+                        raise
+                    print("交易进程仍在收尾，继续等待正常退出")
             server.stop()
-            return 130
+        return 0
 
     execution = SafetyExecution(args.mode)
     recorder = MonitoringRecorder(args.data_dir, live_mode=args.mode)

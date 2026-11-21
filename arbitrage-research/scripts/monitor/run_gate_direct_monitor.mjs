@@ -23,6 +23,7 @@ function parseArgs(argv) {
     else if (key === '--snapshot-seconds') args.snapshotSeconds = Math.max(5, Number(argv[++index]))
     else if (key === '--max-levels') args.maxLevels = Math.max(0, Number(argv[++index]))
     else if (key === '--websocket-url') args.websocketUrl = argv[++index]
+    else if (key === '--stop-file') args.stopFile = resolve(argv[++index])
     else throw new Error(`Unknown argument: ${key}`)
   }
   return args
@@ -404,6 +405,7 @@ async function run() {
     if (closing) return
     closing = true
     clearInterval(timer)
+    clearInterval(stopTimer)
     if (reconnectTimer) clearTimeout(reconnectTimer)
     if (socket?.readyState === WebSocket.OPEN) socket.close()
     await snapshots.close()
@@ -412,6 +414,9 @@ async function run() {
   }
   process.on('SIGINT', () => void close())
   process.on('SIGTERM', () => void close())
+  const stopTimer = setInterval(() => {
+    if (args.stopFile && existsSync(args.stopFile)) void close()
+  }, 200)
   await new Promise(() => undefined)
 }
 

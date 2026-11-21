@@ -1,0 +1,67 @@
+name: Windows portable package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      PYTHONUTF8: '1'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: tools/windows/requirements.txt
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r tools/windows/requirements.txt pytest==9.2.0
+          python -m pip install --no-deps -e arbitrage-research -e arbitrage-live -e arbitrage-realtime
+      - name: Test portable storage, strategy regressions and launcher
+        run: >-
+          python -m pytest -q --import-mode=importlib tools/windows/tests
+          arbitrage-research/tests/test_monitor_hot_path.py
+          arbitrage-research/tests/test_candidate_paper.py
+          arbitrage-research/tests/test_candidate_observations.py
+          arbitrage-research/tests/test_log_storage.py
+          arbitrage-research/tests/test_live_strategy_monitor.py
+          arbitrage-research/tests/test_candidate_stress.py
+          arbitrage-research/tests/test_orderbook_depth.py
+          arbitrage-research/tests/test_dashboard.py
+          arbitrage-live/tests/test_settings.py
+          arbitrage-live/tests/test_dashboard.py
+          arbitrage-live/tests/test_runner.py
+          arbitrage-realtime/tests
+      - name: Build portable runtime and offline dependencies
+        run: python tools/windows/build.py --output dist/windows
+      - name: Test relocated portable package on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $relocatedApp = Join-Path $env:RUNNER_TEMP 'Arbitrage Design 中文'
+          Move-Item -LiteralPath dist/windows/ArbitrageDesign -Destination $relocatedApp
+          python tools/windows/smoke_test.py "$relocatedApp"
+      - name: Upload portable ZIP and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArbitrageDesign-Windows-x64
+          path: |
+            dist/windows/ArbitrageDesign-Windows-x64.zip
+            dist/windows/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

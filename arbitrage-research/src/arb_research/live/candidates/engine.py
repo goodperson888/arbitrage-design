@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_FLOOR
 import hashlib
 import gzip
-import fcntl
+from arb_research.platform_io import exclusive_lock
 import json
 import math
 import os
@@ -102,11 +102,9 @@ class CandidateEngine:
     def __init__(self, directory: Path, started_us: int):
         self.directory = directory
         directory.mkdir(parents=True, exist_ok=True)
-        self._writer_lock = (directory / "writer.lock").open("a")
         try:
-            fcntl.flock(self._writer_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self._writer_lock = exclusive_lock(directory / "writer.lock")
         except OSError:
-            self._writer_lock.close()
             raise RuntimeError("已有进程使用候选账本，禁止重复启动同一数据目录") from None
         self.journal = directory / "accounts.ndjson"
         self.accounts = {}
@@ -201,7 +199,7 @@ class CandidateEngine:
             row["accountId"] = account["id"]
             row["account"] = account
         # Called by the sole worker, off the market-data event loop.
-        with self.journal.open("a") as target:
+        with self.journal.open("a", encoding="utf-8") as target:
             target.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
             target.flush()
             if account is not None:
@@ -233,7 +231,6 @@ class CandidateEngine:
                     self._close_observations()
                 finally:
                     if not self._writer_lock.closed:
-                        fcntl.flock(self._writer_lock.fileno(), fcntl.LOCK_UN)
                         self._writer_lock.close()
 
     def open_markets(self):

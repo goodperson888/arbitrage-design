@@ -19,7 +19,16 @@ Git 保存源代码、参数模板、测试和研究文档；`data/`、`runs/`�
 
 ## Windows 与打包状态
 
-当前上传的是源码版本，尚未提供 Windows 自动打包流水线或可双击运行的 Windows 安装包。研究监控仍有 Unix 文件锁和 `screen` 控制脚本，不能直接把 Mac 虚拟环境复制到 Windows 运行。Windows 迁移需要先完成文件锁、进程控制和依赖安装的适配，并在 Windows 上验证。
+每次推送 `main`，GitHub Actions 的 **Windows portable package** 自动在 Windows 上测试并构建带 Python、Node 和运行依赖的便携 ZIP。请在 Actions 最近成功运行的 **Artifacts** 中下载 **ArbitrageDesign-Windows-x64**，解压程序包后按顺序运行：
+
+1. `01-Configure.cmd`：配置外部数据目录和 Windows 本机代理。
+2. `07-Check-Installation.cmd`：检查安装。
+3. `02-Start-Collectors.cmd`：开启纸上监控、5/15分钟采集和 Gate。
+4. `03-Status.cmd` 查看状态，`04-Stop-All.cmd` 正常关闭全部。
+
+实时辅助网页、实盘管理页各有独立启动脚本。配置和数据放在程序目录之外，更新代码不覆盖账本。启动采集不会自动开启真实交易。
+
+完整下载、迁移、更新、密钥保存和单独控制步骤见 [Windows部署与数据迁移](docs/Windows部署与数据迁移.md)。GitHub 的 **Code → Download ZIP** 是源码，不含便携运行时；Mac 虚拟环境不能复制到 Windows 使用。
 
 ## 本地 Git 同步
 

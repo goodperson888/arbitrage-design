@@ -257,12 +257,23 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8787, symbol: str = "BTCUSDT", interval_seconds: int = 300, proxy: str | None = None, history_path: str | None = None, history_interval_seconds: float = 10.0) -> None:
+def run_server(host: str = "127.0.0.1", port: int = 8787, symbol: str = "BTCUSDT", interval_seconds: int = 300, proxy: str | None = None, history_path: str | None = None, history_interval_seconds: float = 10.0, stop_file: Path | None = None) -> None:
     state = RuntimeState(symbol, interval_seconds, history_path, history_interval_seconds)
     worker = BinanceWorker(state, proxy=proxy)
     worker.start()
     server = ThreadingHTTPServer((host, port), _Handler)
     server.runtime_state = state  # type: ignore[attr-defined]
+    closing = threading.Event()
+
+    def watch_stop():
+        while not closing.wait(0.2):
+            if stop_file is not None and stop_file.exists():
+                server.shutdown()
+                return
+
+    watcher = threading.Thread(target=watch_stop, daemon=True)
+    if stop_file is not None:
+        watcher.start()
     print(f"实时概率页面：http://{host}:{port}")
     print(f"行情：Binance Spot @aggTrade + @bookTicker + @depth5@100ms | symbol={state.symbol} | interval={interval_seconds}s")
     try:
@@ -270,6 +281,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8787, symbol: str = "BTCUSDT
     except KeyboardInterrupt:
         pass
     finally:
+        closing.set()
         worker.stop()
         worker.join(timeout=5)
         server.server_close()
@@ -283,11 +295,12 @@ def main() -> int:
     parser.add_argument("--interval-seconds", type=int, default=int(os.environ.get("REALTIME_INTERVAL_SECONDS", "300")))
     parser.add_argument("--proxy", default=os.environ.get("REALTIME_BINANCE_PROXY"))
     parser.add_argument("--history-path", default=os.environ.get("REALTIME_HISTORY_PATH"))
+    parser.add_argument("--stop-file", type=Path)
     parser.add_argument("--history-interval-seconds", type=float, default=float(os.environ.get("REALTIME_HISTORY_INTERVAL_SECONDS", "10")))
     args = parser.parse_args()
     if args.interval_seconds <= 0:
         parser.error("--interval-seconds must be positive")
-    run_server(args.host, args.port, args.symbol, args.interval_seconds, args.proxy, args.history_path, args.history_interval_seconds)
+    run_server(args.host, args.port, args.symbol, args.interval_seconds, args.proxy, args.history_path, args.history_interval_seconds, args.stop_file)
     return 0
 
 

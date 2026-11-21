@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import fcntl
 import gzip
 import hashlib
 import json
@@ -14,6 +13,8 @@ import time
 from typing import Any, BinaryIO, Iterator
 from uuid import uuid4
 
+from arb_research.platform_io import exclusive_lock, open_regular, sync_directory
+
 
 GIB = 1024 ** 3
 COMPRESSED_PAPER_STREAMS = ("raw", "events", "signals")
@@ -24,14 +25,7 @@ def partition_lock(path: Path) -> BinaryIO:
     """The writer and archiver use the same lock for a plain/gzip pair."""
     plain_name = path.name.removesuffix(".gz")
     lock_path = path.with_name(f".{plain_name}.lock")
-    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-    handle = os.fdopen(descriptor, "a+b")
-    try:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BaseException:
-        handle.close()
-        raise
-    return handle
+    return exclusive_lock(lock_path)
 
 
 def disk_space_state(directory: Path) -> dict[str, Any]:
@@ -119,7 +113,7 @@ def _digest(handle: BinaryIO) -> tuple[str, int, int]:
 
 def _journal(root: Path, entry: dict[str, Any]) -> None:
     path = root / "storage_archive_manifest.ndjson"
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    descriptor = open_regular(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
     with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, ensure_ascii=False, separators=(",", ":")) + "\n")
         handle.flush()
@@ -127,11 +121,7 @@ def _journal(root: Path, entry: dict[str, Any]) -> None:
 
 
 def _sync_directory(directory: Path) -> None:
-    descriptor = os.open(directory, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
+    sync_directory(directory)
 
 
 def archive_partition(root: Path, path: Path) -> dict[str, Any]:

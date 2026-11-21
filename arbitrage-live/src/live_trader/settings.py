@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import ssl
 import subprocess
@@ -159,8 +160,12 @@ class KeychainSecretStore:
         self.service = service
         self.account = account
         self.runner = runner or subprocess.run
+        self.windows_native = os.name == "nt" and runner is None
 
     def get(self) -> str:
+        if self.windows_native:
+            from .windows_credentials import read_secret
+            return read_secret(f"{self.service}/{self.account}")
         try:
             result = self.runner(
                 ["security", "find-generic-password", "-a", self.account, "-s", self.service, "-w"],
@@ -177,6 +182,10 @@ class KeychainSecretStore:
         value = str(secret).strip()
         if not value:
             raise ValueError("private key cannot be empty")
+        if self.windows_native:
+            from .windows_credentials import write_secret
+            write_secret(f"{self.service}/{self.account}", value)
+            return
         self.runner(
             ["security", "add-generic-password", "-U", "-a", self.account, "-s", self.service, "-w", value],
             check=True,

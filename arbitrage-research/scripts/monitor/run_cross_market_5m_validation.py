@@ -5,7 +5,6 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
-import signal
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +14,7 @@ from arb_research.live.cross_market_validation import (
     CrossMarketValidationConfig,
     CrossMarketValidationService,
 )
+from arb_research.runtime_control import shutdown_control
 
 
 def parse_args(default_config: Path | None = None) -> argparse.Namespace:
@@ -26,6 +26,7 @@ def parse_args(default_config: Path | None = None) -> argparse.Namespace:
         default=default_config or ROOT / "configs/research/cross_market_5m_validation_v1.json",
     )
     parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--stop-file", type=Path)
     parser.add_argument("--proxy")
     parser.add_argument("--duration-hours", type=float)
     parser.add_argument("--store-raw", action="store_true", help="抽样保存原始消息（默认关闭）")
@@ -61,12 +62,6 @@ async def run(args: argparse.Namespace) -> None:
         proxy=args.proxy,
     )
     service = CrossMarketValidationService(config)
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, service.request_stop)
-        except NotImplementedError:
-            pass
     print(f"Cross-market BTC {config.market_duration_minutes}m validation collector started")
     print(f"Data: {config.data_dir.resolve()}")
     print(
@@ -75,7 +70,8 @@ async def run(args: argparse.Namespace) -> None:
     )
     print("Storage: 1 aggregate snapshot/second; raw high-frequency messages disabled by default")
     print("Trading: disabled (observation and validation only)")
-    await service.run(args.duration_hours * 3600 if args.duration_hours else None)
+    async with shutdown_control(service.request_stop, getattr(args, "stop_file", None)):
+        await service.run(args.duration_hours * 3600 if args.duration_hours else None)
 
 
 def main() -> int:
