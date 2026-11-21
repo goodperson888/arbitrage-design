@@ -47,6 +47,8 @@ jobs:
           arbitrage-live/tests/test_dashboard.py
           arbitrage-live/tests/test_runner.py
           arbitrage-realtime/tests
+      - name: Test Gate parser without browser dependencies
+        run: node --test arbitrage-research/tests/node/gate_low_frequency_monitor.test.mjs
       - name: Build portable runtime and offline dependencies
         run: python tools/windows/build.py --output dist/windows
       - name: Test relocated portable package on Windows

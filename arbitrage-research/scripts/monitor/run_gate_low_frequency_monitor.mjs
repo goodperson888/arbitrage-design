@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { chromium } from 'playwright-core'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -494,6 +493,9 @@ function paperStats(runtime) {
 }
 
 async function run() {
+  // The direct collector imports only the normalizer/parser from this file.
+  // Load browser automation only when the browser collector is actually run.
+  const { chromium } = await import('playwright-core')
   const args = parseArgs(process.argv.slice(2))
   mkdirSync(args.dataDir, { recursive: true })
   const statePath = join(args.dataDir, 'state', 'latest.json')

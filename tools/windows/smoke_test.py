@@ -25,10 +25,15 @@ def smoke(root: Path) -> None:
                            env=env, cwd=root, check=True, timeout=150)
 
         run("doctor")
+        subprocess.run(f'"{root / "Arbitrage.cmd"}" doctor', shell=True,
+                       env=env, cwd=root, check=True, timeout=60)
         services = ("paper", "cross", "cross15", "gate", "realtime", "live")
         try:
             for service in services:
                 run("start", service)
+            for service in services:
+                with (data / f"persistent/.control/{service}.json").open(encoding="utf-8") as handle:
+                    assert json.load(handle)["status"] == "running", f"{service} exited during startup"
             # Starting twice must not create a second writer.
             before = (data / "persistent/.control/paper.json").read_bytes()
             run("start", "paper")
@@ -39,6 +44,11 @@ def smoke(root: Path) -> None:
                     assert response.status == 200
                     assert b"<html" in response.read().lower() or port == 8766
             run("status")
+        except BaseException:
+            for log in sorted((data / "persistent/launcher_logs").glob("*.log")):
+                print(f"--- {log.name} ---", flush=True)
+                print("\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-45:]), flush=True)
+            raise
         finally:
             run("stop", "all")
         # Closed gzip partitions must have trailers and be decompressible.
