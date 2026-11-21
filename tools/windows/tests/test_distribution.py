@@ -60,6 +60,10 @@ def test_application_copy_from_actual_repository_preserves_sources(tmp_path):
     assert {name for name in actual if name.endswith(".md")} == {"使用说明.md"}
     assert (app / "使用说明.md").read_bytes() == (ROOT / "tools/windows/customer-guide.md").read_bytes()
     assert (ROOT / "00-总设计文档.md").read_bytes() == original
+    for page in ("arbitrage-realtime/web/index.html",
+                 "arbitrage-live/src/live_trader/static/index.html",
+                 "arbitrage-research/src/arb_research/live/static/index.html"):
+        assert b"<html" in (app / page).read_bytes().lower()
     # Every Python package and static resource is available at the same path.
     for source, target in distribution.select_files(names):
         assert (app / target).read_bytes() == (ROOT / source).read_bytes()

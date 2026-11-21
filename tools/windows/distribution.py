@@ -27,6 +27,7 @@ FILES = {
         "arbitrage-live/config/strategy_down_spot5m_v1.json",
         "arbitrage-live/config/venue.json",
         "arbitrage-realtime/config/realtime.json",
+        "arbitrage-realtime/web/index.html",
     )
 }
 FILES["tools/windows/customer-guide.md"] = "使用说明.md"
