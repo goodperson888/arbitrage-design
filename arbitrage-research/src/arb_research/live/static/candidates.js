@@ -155,6 +155,15 @@
         ? `服务器校时正常 · 本机${clock.localAheadMs >= 0 ? "快" : "慢"}${num(Math.abs(clock.localAheadMs), 0)}ms · 校时往返${num(clock.roundTripMs, 0)}ms`
         : `服务器校时${clock.status === "stale" ? "已过期" : "未完成"}，暂停新开仓${clock.error ? ` · ${clock.error}` : ""}`;
       get("candidate-health").textContent += ` · ${clockText}`;
+      get("candidate-health").textContent += clock.sampleAgeSeconds == null
+        ? " · 尚无成功校时记录"
+        : ` · 上次成功校时${num(clock.sampleAgeSeconds, 0)}秒前`;
+      if (clock.error && clock.status === "synced") {
+        get("candidate-health").textContent += ` · 最近校时失败，现有校时仍有效 · ${clock.error}`;
+      }
+      if (clock.nextAttemptInSeconds != null) {
+        get("candidate-health").textContent += ` · ${num(clock.nextAttemptInSeconds, 0)}秒后${clock.error || clock.status !== "synced" ? "重试校时" : "重新校时"}`;
+      }
     }
     const error = c.runtimeError || c.failure;
     get("candidate-error").hidden = !error;

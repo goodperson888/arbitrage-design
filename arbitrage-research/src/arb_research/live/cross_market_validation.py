@@ -740,7 +740,11 @@ class CrossMarketValidationService:
         self.request_stop()
 
     async def run(self, duration_seconds: float | None = None) -> None:
-        await market_clock.synchronize(self.config.proxy)
+        async with market_clock.client(self.config.proxy) as clock_client:
+            await self._run_with_clock(clock_client, duration_seconds)
+
+    async def _run_with_clock(self, clock_client, duration_seconds: float | None) -> None:
+        await market_clock.synchronize(client=clock_client)
         collectors = (
             BinanceCollector(self._on_update, self._on_status, proxy=self.config.proxy),
             BinanceFuturesCollector(self._on_update, self._on_status, proxy=self.config.proxy),
@@ -755,7 +759,7 @@ class CrossMarketValidationService:
         )
         tasks = [asyncio.create_task(item.run(self.stop_event)) for item in collectors]
         tasks.extend([
-            asyncio.create_task(market_clock.maintain(self.config.proxy)),
+            asyncio.create_task(market_clock.maintain(client=clock_client)),
             asyncio.create_task(self._market_loop()), asyncio.create_task(self._snapshot_loop()),
             asyncio.create_task(self._settlement_loop()), asyncio.create_task(self._state_writer_loop()),
         ])

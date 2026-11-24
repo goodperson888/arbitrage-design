@@ -497,9 +497,13 @@ class ResearchPaperMonitor:
         self.store.close()
 
     async def run(self, duration_seconds: float | None = None) -> None:
-        await market_clock.synchronize(self.config.proxy)
+        async with market_clock.client(self.config.proxy) as clock_client:
+            await self._run_with_clock(clock_client, duration_seconds)
+
+    async def _run_with_clock(self, clock_client, duration_seconds: float | None) -> None:
+        await market_clock.synchronize(client=clock_client)
         tasks = [
-            asyncio.create_task(market_clock.maintain(self.config.proxy)),
+            asyncio.create_task(market_clock.maintain(client=clock_client)),
             asyncio.create_task(self._market_loop()),
             asyncio.create_task(self._settlement_loop()),
             asyncio.create_task(self._state_writer_loop()),
