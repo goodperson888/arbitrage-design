@@ -11,6 +11,8 @@ class MarketClock:
     MAX_AGE_SECONDS = 180
     REFRESH_SECONDS = 60
     RETRY_SECONDS = 5
+    REBUILD_AFTER_FAILURES = 3
+    CLIENT_CLOSE_SECONDS = 3
     SAMPLES_PER_ENDPOINT = 3
     URLS = ("https://api.binance.com/api/v3/time", "https://data-api.binance.vision/api/v3/time")
 
@@ -24,6 +26,9 @@ class MarketClock:
         self._next_attempt_ns = None
         self._endpoint = None
         self._consecutive_failures = 0
+        self._pool_rebuilds = 0
+        self._pool_rebuilt_ns = None
+        self._pool_cleanup_error = None
         self.error = None
         self.enabled = False
 
@@ -65,7 +70,10 @@ class MarketClock:
                     "endpoint": self._endpoint,
                     "lastAttemptAgeSeconds": None if self._attempted_ns is None else max(0, (now - self._attempted_ns) / 1e9),
                     "nextAttemptInSeconds": None if self._next_attempt_ns is None else max(0, (self._next_attempt_ns - now) / 1e9),
-                    "consecutiveFailures": self._consecutive_failures}
+                    "consecutiveFailures": self._consecutive_failures,
+                    "poolRebuilds": self._pool_rebuilds,
+                    "lastPoolRebuildAgeSeconds": None if self._pool_rebuilt_ns is None else max(0, (now - self._pool_rebuilt_ns) / 1e9),
+                    "poolCleanupError": self._pool_cleanup_error}
 
     def client(self, proxy=None):
         """Owned by the service's async context, including startup and shutdown."""
@@ -111,21 +119,58 @@ class MarketClock:
             self._consecutive_failures += 1
         return False
 
+    async def _close_client(self, client):
+        """A broken transport must not hang pool recovery or swallow cancellation."""
+        import httpx
+
+        try:
+            await asyncio.wait_for(client.aclose(), timeout=self.CLIENT_CLOSE_SECONDS)
+        except (httpx.HTTPError, OSError, TimeoutError) as exc:
+            return f"{type(exc).__name__}: {exc}"
+        return None
+
     async def maintain(self, proxy=None, *, client=None):
+        """Maintain calibration, replacing only the dedicated clock connection pool.
+
+        The caller owns the initial client's context; this loop closes it when
+        unhealthy and owns every replacement until shutdown. Pass the same proxy
+        used to create the initial client so recovery preserves routing.
+        """
         if client is None:
             async with self.client(proxy) as scoped_client:
-                await self.maintain(client=scoped_client)
+                await self.maintain(proxy, client=scoped_client)
             return
+        current = client
+        owns_replacement = False
+        with self._lock:
+            failed_rounds = self._consecutive_failures
         try:
             while True:
+                if failed_rounds >= self.REBUILD_AFTER_FAILURES:
+                    cleanup_error = await self._close_client(current)
+                    current = self.client(proxy)
+                    owns_replacement = True
+                    failed_rounds = 0
+                    with self._lock:
+                        self._pool_rebuilds += 1
+                        self._pool_rebuilt_ns = time.monotonic_ns()
+                        self._pool_cleanup_error = cleanup_error
+                    # Rebuilding is not calibration. Keep the old sample age,
+                    # last network error and total consecutive failures intact.
                 with self._lock:
                     delay = self.REFRESH_SECONDS if self.snapshot()["status"] == "synced" and not self.error else self.RETRY_SECONDS
                     self._next_attempt_ns = time.monotonic_ns() + int(delay * 1e9)
                 await asyncio.sleep(delay)
-                await self.synchronize(client=client)
+                success = await self.synchronize(client=current)
+                failed_rounds = 0 if success else failed_rounds + 1
         finally:
             with self._lock:
                 self._next_attempt_ns = None
+            if owns_replacement:
+                cleanup_error = await self._close_client(current)
+                if cleanup_error:
+                    with self._lock:
+                        self._pool_cleanup_error = cleanup_error
 
 
 market_clock = MarketClock()

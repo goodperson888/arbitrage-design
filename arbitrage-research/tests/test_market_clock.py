@@ -196,6 +196,168 @@ def test_pending_or_stale_clock_stays_blocked_when_every_probe_fails(monkeypatch
     asyncio.run(run())
 
 
+def test_pool_timeout_rebuild_keeps_proxy_and_stale_gate_until_real_recovery(monkeypatch):
+    async def run():
+        old, values, requested = scripted_client(monkeypatch,
+            [(10_000_000, httpx.PoolTimeout('pool exhausted'))] * 18)
+        clock = MarketClock()
+        clock.accept_sample(BASE // 1000, values['mono'] - 10_000_000, values['mono'])
+        old_sample = clock._received_ns
+        values['mono'] += 181_000_000_000
+        new_requests, created, delays = [], [], []
+
+        async def recovered(request):
+            new_requests.append(str(request.url))
+            values['mono'] += 20_000_000
+            return httpx.Response(200, json={'serverTime': BASE // 1000 + values['mono'] // 1_000_000})
+
+        replacement = httpx.AsyncClient(transport=httpx.MockTransport(recovered))
+
+        def create(proxy):
+            created.append(proxy)
+            assert old.is_closed
+            assert clock.snapshot()['status'] == 'stale'
+            assert clock._received_ns == old_sample
+            assert clock.snapshot()['consecutiveFailures'] == 3
+            return replacement
+
+        async def sleep(seconds):
+            delays.append(seconds)
+            values['mono'] += seconds * 1_000_000_000
+            if len(delays) == 3:
+                # A new pool alone must never pretend the clock is healthy.
+                assert clock.snapshot()['poolRebuilds'] == 1
+                assert clock.snapshot()['status'] == 'stale'
+                assert clock._received_ns == old_sample
+                assert 'PoolTimeout' in clock.error
+            if len(delays) == 4:
+                assert clock.snapshot()['status'] == 'synced'
+                assert clock.error is None
+                assert clock.snapshot()['consecutiveFailures'] == 0
+                raise asyncio.CancelledError()
+
+        monkeypatch.setattr(clock, 'client', create)
+        monkeypatch.setattr(clock_module.asyncio, 'sleep', sleep)
+        async with old:
+            assert not await clock.synchronize(client=old)  # Startup failure counts.
+            with pytest.raises(asyncio.CancelledError):
+                await clock.maintain('http://127.0.0.1:7890', client=old)
+        assert created == ['http://127.0.0.1:7890']
+        assert delays == [5, 5, 5, 60]
+        assert len(requested) == 18
+        assert len(new_requests) == 3
+        assert old.is_closed and replacement.is_closed
+        assert clock.snapshot()['nextAttemptInSeconds'] is None
+        assert clock.snapshot()['lastPoolRebuildAgeSeconds'] is not None
+
+    asyncio.run(run())
+
+
+def test_persistent_outage_rebuilds_every_three_failed_rounds_without_unlocking(monkeypatch):
+    async def run():
+        clock = MarketClock()
+        clients, proxies, delays, request_counts = [], [], [], []
+
+        def create(proxy):
+            if clients:
+                assert clients[-1].is_closed
+            proxies.append(proxy)
+            index = len(clients)
+            request_counts.append(0)
+
+            async def unavailable(request):
+                request_counts[index] += 1
+                raise httpx.PoolTimeout('still unavailable')
+
+            client = httpx.AsyncClient(transport=httpx.MockTransport(unavailable))
+            clients.append(client)
+            return client
+
+        async def sleep(seconds):
+            delays.append(seconds)
+            assert clock.snapshot()['status'] == 'pending'
+            assert clock.snapshot()['sampleAgeSeconds'] is None
+            if len(delays) == 7:
+                raise asyncio.CancelledError()
+
+        monkeypatch.setattr(clock, 'client', create)
+        monkeypatch.setattr(clock_module.asyncio, 'sleep', sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await clock.maintain('http://127.0.0.1:7890')
+        assert proxies == ['http://127.0.0.1:7890'] * 3
+        assert request_counts == [18, 18, 0]
+        assert clock.snapshot()['poolRebuilds'] == 2
+        assert clock.snapshot()['consecutiveFailures'] == 6
+        assert 'PoolTimeout' in clock.error
+        assert all(client.is_closed for client in clients)
+        assert delays == [5] * 7
+
+    asyncio.run(run())
+
+
+def test_success_resets_pool_failure_threshold_and_preserves_connection_reuse(monkeypatch):
+    async def run():
+        client, values, _ = scripted_client(monkeypatch,
+            ([(10_000_000, 503)] * 12 + [(10_000_000, 200)] * 3) * 2)
+        clock, created, delays = MarketClock(), [], []
+
+        def create(proxy):
+            created.append(proxy)
+            return client
+
+        async def sleep(seconds):
+            delays.append(seconds)
+            values['mono'] += seconds * 1_000_000_000
+            if len(delays) == 7:
+                raise asyncio.CancelledError()
+
+        monkeypatch.setattr(clock, 'client', create)
+        monkeypatch.setattr(clock_module.asyncio, 'sleep', sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await clock.maintain('http://127.0.0.1:7890')
+        assert len(created) == 1
+        assert clock.snapshot()['poolRebuilds'] == 0
+        assert clock.snapshot()['consecutiveFailures'] == 0
+        assert delays == [5, 5, 5, 60, 5, 5, 60]
+        assert client.is_closed
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('mode', ['timeout', 'oserror'])
+def test_broken_pool_cleanup_is_bounded_and_reported(mode):
+    async def run():
+        clock = MarketClock()
+        clock.CLIENT_CLOSE_SECONDS = .01
+
+        async def close():
+            if mode == 'oserror':
+                raise OSError('close failed')
+            await asyncio.Event().wait()
+
+        error = await clock._close_client(SimpleNamespace(aclose=close))
+        assert ('TimeoutError' if mode == 'timeout' else 'OSError') in error
+
+    asyncio.run(run())
+
+
+def test_cancellation_during_pool_cleanup_is_not_swallowed():
+    async def run():
+        clock, entered = MarketClock(), asyncio.Event()
+
+        async def close():
+            entered.set()
+            await asyncio.Event().wait()
+
+        task = asyncio.create_task(clock._close_client(SimpleNamespace(aclose=close)))
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("service_kind", ["paper", "cross"])
 def test_service_closes_clock_client_when_startup_is_cancelled(monkeypatch, service_kind):
     from arb_research.live.strategy_monitor import ResearchPaperMonitor

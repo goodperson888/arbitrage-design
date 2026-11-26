@@ -759,7 +759,7 @@ class CrossMarketValidationService:
         )
         tasks = [asyncio.create_task(item.run(self.stop_event)) for item in collectors]
         tasks.extend([
-            asyncio.create_task(market_clock.maintain(client=clock_client)),
+            asyncio.create_task(market_clock.maintain(self.config.proxy, client=clock_client)),
             asyncio.create_task(self._market_loop()), asyncio.create_task(self._snapshot_loop()),
             asyncio.create_task(self._settlement_loop()), asyncio.create_task(self._state_writer_loop()),
         ])

@@ -503,7 +503,7 @@ class ResearchPaperMonitor:
     async def _run_with_clock(self, clock_client, duration_seconds: float | None) -> None:
         await market_clock.synchronize(client=clock_client)
         tasks = [
-            asyncio.create_task(market_clock.maintain(client=clock_client)),
+            asyncio.create_task(market_clock.maintain(self.config.proxy, client=clock_client)),
             asyncio.create_task(self._market_loop()),
             asyncio.create_task(self._settlement_loop()),
             asyncio.create_task(self._state_writer_loop()),
